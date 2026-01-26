@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using DG.Tweening;
 using SlotClicker.Core;
@@ -70,6 +71,15 @@ namespace SlotClicker.UI
 
         private void CreateUI()
         {
+            // EventSystem 확인 및 생성 (UI 입력 처리에 필수!)
+            if (FindObjectOfType<EventSystem>() == null)
+            {
+                GameObject eventSystemObj = new GameObject("EventSystem");
+                eventSystemObj.AddComponent<EventSystem>();
+                eventSystemObj.AddComponent<StandaloneInputModule>();
+                Debug.Log("[SlotClickerUI] EventSystem created");
+            }
+
             // 캔버스 생성
             if (_mainCanvas == null)
             {
