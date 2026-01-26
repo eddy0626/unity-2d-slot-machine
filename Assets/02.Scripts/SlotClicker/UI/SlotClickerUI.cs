@@ -126,22 +126,23 @@ namespace SlotClicker.UI
 
         private void CreateTopHUD(RectTransform parent)
         {
-            // HUD 배경
+            // HUD 배경 - 화면 최상단에 고정
             GameObject hudPanel = CreatePanel(parent, "TopHUD", new Vector2(0, 1), new Vector2(1, 1),
-                new Vector2(0, -100), new Vector2(0, 0), new Color(0.1f, 0.1f, 0.15f, 0.95f));
+                new Vector2(0, 0), new Vector2(0, 0), new Color(0.1f, 0.1f, 0.15f, 0.95f));
             RectTransform hudRect = hudPanel.GetComponent<RectTransform>();
-            hudRect.sizeDelta = new Vector2(0, 120);
+            hudRect.anchoredPosition = new Vector2(0, -60); // 상단에서 60px
+            hudRect.sizeDelta = new Vector2(0, 100);
 
             // 골드 표시
             GameObject goldObj = CreateTextObject(hudRect, "GoldText", "0 Gold",
-                new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(30, 0), 36);
+                new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(40, 0), 32);
             _goldText = goldObj.GetComponent<TextMeshProUGUI>();
             _goldText.color = new Color(1f, 0.85f, 0.2f);
             _goldText.alignment = TextAlignmentOptions.Left;
 
             // 칩 표시
             GameObject chipsObj = CreateTextObject(hudRect, "ChipsText", "0 Chips",
-                new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-30, 0), 28);
+                new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-40, 0), 24);
             _chipsText = chipsObj.GetComponent<TextMeshProUGUI>();
             _chipsText.color = new Color(0.6f, 0.8f, 1f);
             _chipsText.alignment = TextAlignmentOptions.Right;
@@ -149,9 +150,9 @@ namespace SlotClicker.UI
 
         private void CreateSlotArea(RectTransform parent)
         {
-            // 슬롯 패널
+            // 슬롯 패널 - 상단 HUD 아래에 배치
             GameObject slotPanel = CreatePanel(parent, "SlotPanel", new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, -250), new Vector2(600, 250), new Color(0.15f, 0.1f, 0.2f, 1f));
+                new Vector2(0, -200), new Vector2(550, 180), new Color(0.15f, 0.1f, 0.2f, 1f));
             RectTransform slotRect = slotPanel.GetComponent<RectTransform>();
 
             // 슬롯 프레임
@@ -160,14 +161,14 @@ namespace SlotClicker.UI
 
             // 릴 심볼들
             _reelSymbols = new Image[3];
-            float spacing = 180f;
+            float spacing = 160f;
             float startX = -spacing;
 
             for (int i = 0; i < 3; i++)
             {
                 GameObject reelBg = CreatePanel(slotRect, $"ReelBg_{i}",
                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                    new Vector2(startX + (i * spacing), 0), new Vector2(150, 150),
+                    new Vector2(startX + (i * spacing), 0), new Vector2(120, 120),
                     new Color(0.05f, 0.05f, 0.1f, 1f));
 
                 GameObject symbolObj = new GameObject($"Symbol_{i}");
@@ -175,8 +176,8 @@ namespace SlotClicker.UI
                 RectTransform symRect = symbolObj.AddComponent<RectTransform>();
                 symRect.anchorMin = Vector2.zero;
                 symRect.anchorMax = Vector2.one;
-                symRect.offsetMin = new Vector2(10, 10);
-                symRect.offsetMax = new Vector2(-10, -10);
+                symRect.offsetMin = new Vector2(8, 8);
+                symRect.offsetMax = new Vector2(-8, -8);
 
                 _reelSymbols[i] = symbolObj.AddComponent<Image>();
                 _reelSymbols[i].color = GetSymbolColor(i);
@@ -185,12 +186,12 @@ namespace SlotClicker.UI
 
         private void CreateClickArea(RectTransform parent)
         {
-            // 클릭 영역 (카지노 테이블)
+            // 클릭 영역 (카지노 테이블) - 화면 중앙
             GameObject clickPanel = CreatePanel(parent, "ClickArea", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(0, -100), new Vector2(800, 400), new Color(0.1f, 0.4f, 0.15f, 1f));
+                new Vector2(0, 50), new Vector2(700, 300), new Color(0.1f, 0.4f, 0.15f, 1f));
             RectTransform clickRect = clickPanel.GetComponent<RectTransform>();
 
-            AddOutline(clickPanel, new Color(0.6f, 0.4f, 0.1f), 6);
+            AddOutline(clickPanel, new Color(0.6f, 0.4f, 0.1f), 5);
 
             // 버튼 컴포넌트
             _clickArea = clickPanel.AddComponent<Button>();
@@ -198,7 +199,7 @@ namespace SlotClicker.UI
 
             // 테이블 텍스트
             GameObject tableText = CreateTextObject(clickRect, "TableText", "TAP TO EARN",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 48);
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 40);
             TextMeshProUGUI tableTmp = tableText.GetComponent<TextMeshProUGUI>();
             tableTmp.color = new Color(1f, 0.9f, 0.6f, 0.8f);
             tableTmp.alignment = TextAlignmentOptions.Center;
@@ -209,14 +210,15 @@ namespace SlotClicker.UI
 
         private void CreateBettingUI(RectTransform parent)
         {
-            // 베팅 패널
+            // 베팅 패널 - 하단에 고정
             GameObject betPanel = CreatePanel(parent, "BetPanel", new Vector2(0, 0), new Vector2(1, 0),
-                new Vector2(0, 300), new Vector2(0, 280), new Color(0.12f, 0.1f, 0.18f, 0.95f));
+                new Vector2(0, 0), new Vector2(0, 250), new Color(0.12f, 0.1f, 0.18f, 0.95f));
             RectTransform betRect = betPanel.GetComponent<RectTransform>();
+            betRect.anchoredPosition = new Vector2(0, 125); // 하단에서 125px 위
 
             // 현재 베팅액 표시
             GameObject betAmountObj = CreateTextObject(betRect, "BetAmountText", "Bet: 0",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -20), 32);
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -15), 26);
             _betAmountText = betAmountObj.GetComponent<TextMeshProUGUI>();
             _betAmountText.color = Color.white;
             _betAmountText.alignment = TextAlignmentOptions.Center;
@@ -225,8 +227,10 @@ namespace SlotClicker.UI
             _betButtons = new Button[4];
             string[] betLabels = { "10%", "30%", "50%", "ALL" };
             float[] betValues = { 0.1f, 0.3f, 0.5f, 1f };
-            float buttonWidth = 150f;
-            float startX = -((buttonWidth * 4) + 30) / 2 + buttonWidth / 2;
+            float buttonWidth = 130f;
+            float buttonSpacing = 15f;
+            float totalWidth = (buttonWidth * 4) + (buttonSpacing * 3);
+            float startX = -totalWidth / 2 + buttonWidth / 2;
 
             for (int i = 0; i < 4; i++)
             {
@@ -235,31 +239,32 @@ namespace SlotClicker.UI
 
                 GameObject btnObj = CreateButton(betRect, $"BetBtn_{i}", betLabels[i],
                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                    new Vector2(startX + (i * (buttonWidth + 10)), 20),
-                    new Vector2(buttonWidth, 60),
+                    new Vector2(startX + (i * (buttonWidth + buttonSpacing)), 30),
+                    new Vector2(buttonWidth, 50),
                     new Color(0.3f, 0.3f, 0.5f));
 
                 _betButtons[i] = btnObj.GetComponent<Button>();
                 _betButtons[i].onClick.AddListener(() => SetBetPercentage(betValue));
             }
 
-            // 스핀 버튼
+            // 스핀 버튼 - 하단에 배치
             GameObject spinObj = CreateButton(betRect, "SpinButton", "SPIN!",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(0, 60), new Vector2(300, 80),
+                new Vector2(0, 45), new Vector2(250, 65),
                 new Color(0.8f, 0.2f, 0.2f));
             _spinButton = spinObj.GetComponent<Button>();
             _spinButton.onClick.AddListener(OnSpinClicked);
 
             TextMeshProUGUI spinText = spinObj.GetComponentInChildren<TextMeshProUGUI>();
-            spinText.fontSize = 36;
+            spinText.fontSize = 28;
             spinText.fontStyle = FontStyles.Bold;
         }
 
         private void CreateResultText(RectTransform parent)
         {
+            // 결과 텍스트 - 클릭 영역 위에 표시
             GameObject resultObj = CreateTextObject(parent, "ResultText", "",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 200), 48);
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 250), 40);
             _resultText = resultObj.GetComponent<TextMeshProUGUI>();
             _resultText.color = Color.white;
             _resultText.alignment = TextAlignmentOptions.Center;
@@ -366,10 +371,10 @@ namespace SlotClicker.UI
 
         private void CreateUpgradeButton(RectTransform parent)
         {
-            // 업그레이드 버튼 (화면 왼쪽 상단)
+            // 업그레이드 버튼 (화면 오른쪽 상단, HUD 바로 아래)
             GameObject btnObj = CreateButton(parent, "UpgradeButton", "UPGRADES",
-                new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(100, -180), new Vector2(160, 50),
+                new Vector2(1, 1), new Vector2(1, 1),
+                new Vector2(-100, -140), new Vector2(160, 50),
                 new Color(0.4f, 0.3f, 0.7f));
 
             _upgradeButton = btnObj.GetComponent<Button>();
