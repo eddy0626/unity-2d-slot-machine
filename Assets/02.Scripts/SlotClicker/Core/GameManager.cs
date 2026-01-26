@@ -1,0 +1,151 @@
+using System;
+using UnityEngine;
+using SlotClicker.Data;
+
+namespace SlotClicker.Core
+{
+    public class GameManager : MonoBehaviour
+    {
+        public static GameManager Instance { get; private set; }
+
+        [Header("설정")]
+        [SerializeField] private GameConfig _config;
+
+        [Header("상태")]
+        [SerializeField] private bool _isInitialized = false;
+
+        // 매니저 참조
+        public GoldManager Gold { get; private set; }
+        public ClickManager Click { get; private set; }
+        public SlotManager Slot { get; private set; }
+
+        // 플레이어 데이터
+        public PlayerData PlayerData { get; private set; }
+        public GameConfig Config => _config;
+
+        // 이벤트
+        public event Action OnGameInitialized;
+        public event Action OnGameStateChanged;
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+
+        private void Start()
+        {
+            Initialize();
+        }
+
+        public void Initialize()
+        {
+            if (_isInitialized) return;
+
+            // Config 기본값 생성
+            if (_config == null)
+            {
+                _config = ScriptableObject.CreateInstance<GameConfig>();
+                Debug.LogWarning("[GameManager] GameConfig not assigned, using default values.");
+            }
+
+            _config.NormalizeProbabilities();
+
+            // 플레이어 데이터 로드 또는 생성
+            LoadPlayerData();
+
+            // 매니저 초기화
+            InitializeManagers();
+
+            _isInitialized = true;
+            Debug.Log("[GameManager] Game initialized successfully!");
+            OnGameInitialized?.Invoke();
+        }
+
+        private void InitializeManagers()
+        {
+            // GoldManager 초기화
+            Gold = gameObject.AddComponent<GoldManager>();
+            Gold.Initialize(this);
+
+            // ClickManager 초기화
+            Click = gameObject.AddComponent<ClickManager>();
+            Click.Initialize(this);
+
+            // SlotManager 초기화
+            Slot = gameObject.AddComponent<SlotManager>();
+            Slot.Initialize(this);
+        }
+
+        private void LoadPlayerData()
+        {
+            // TODO: 실제 저장/로드 구현
+            string savedData = PlayerPrefs.GetString("SlotClickerSaveData", "");
+
+            if (!string.IsNullOrEmpty(savedData))
+            {
+                try
+                {
+                    PlayerData = JsonUtility.FromJson<PlayerData>(savedData);
+                    Debug.Log("[GameManager] Player data loaded.");
+                }
+                catch
+                {
+                    PlayerData = new PlayerData();
+                    Debug.Log("[GameManager] Failed to load, creating new data.");
+                }
+            }
+            else
+            {
+                PlayerData = new PlayerData();
+                Debug.Log("[GameManager] New player data created.");
+            }
+        }
+
+        public void SavePlayerData()
+        {
+            if (PlayerData == null) return;
+
+            PlayerData.lastPlayTime = DateTime.Now.ToString("o");
+            string json = JsonUtility.ToJson(PlayerData);
+            PlayerPrefs.SetString("SlotClickerSaveData", json);
+            PlayerPrefs.Save();
+            Debug.Log("[GameManager] Player data saved.");
+        }
+
+        public void NotifyStateChanged()
+        {
+            OnGameStateChanged?.Invoke();
+        }
+
+        private void OnApplicationPause(bool pause)
+        {
+            if (pause) SavePlayerData();
+        }
+
+        private void OnApplicationQuit()
+        {
+            SavePlayerData();
+        }
+
+        // 프레스티지 (나중에 구현)
+        public int CalculatePrestigeChips()
+        {
+            if (PlayerData.totalGoldEarned < _config.prestigeThreshold)
+                return 0;
+
+            return Mathf.FloorToInt((float)(Math.Log10(PlayerData.totalGoldEarned) - 5));
+        }
+
+        public float GetPrestigeBonus()
+        {
+            return 1f + (PlayerData.chips * _config.prestigeBonusPerChip);
+        }
+    }
+}
