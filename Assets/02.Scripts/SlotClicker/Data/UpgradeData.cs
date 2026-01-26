@@ -146,9 +146,9 @@ namespace SlotClicker.Data
                     category = UpgradeCategory.Click,
                     effect = UpgradeEffect.ClickPower,
                     baseCost = 10,
-                    costMultiplier = 1.15f,
+                    costMultiplier = 1.12f,  // 1.15 → 1.12 (후반 비용 완화)
                     maxLevel = -1,
-                    effectPerLevel = 25f,  // 레벨당 25% 증가 (기존 0.5%)
+                    effectPerLevel = 15f,    // 25 → 15 (다른 업그레이드와 균형)
                     effectFormat = "+{0}%"
                 },
                 new UpgradeData
@@ -159,8 +159,8 @@ namespace SlotClicker.Data
                     category = UpgradeCategory.Click,
                     effect = UpgradeEffect.CriticalChance,
                     baseCost = 50,
-                    costMultiplier = 1.2f,
-                    maxLevel = 45, // 최대 50% (기본 5% + 45%)
+                    costMultiplier = 1.18f,  // 1.2 → 1.18
+                    maxLevel = 45,
                     effectPerLevel = 1f,
                     effectFormat = "+{0}%"
                 },
@@ -172,14 +172,14 @@ namespace SlotClicker.Data
                     category = UpgradeCategory.Click,
                     effect = UpgradeEffect.CriticalMultiplier,
                     baseCost = 100,
-                    costMultiplier = 1.25f,
+                    costMultiplier = 1.20f,  // 1.25 → 1.20
                     maxLevel = -1,
-                    effectPerLevel = 0.25f,  // 레벨당 +0.25x (기존 0.5f)
+                    effectPerLevel = 0.3f,   // 0.25 → 0.3 (크리티컬 매력도 증가)
                     effectFormat = "+{0}x"
                 }
             };
 
-            // 슬롯 업그레이드
+            // 슬롯 업그레이드 (슬롯 EV 85% 기준 조정)
             slotUpgrades = new UpgradeData[]
             {
                 new UpgradeData
@@ -190,9 +190,9 @@ namespace SlotClicker.Data
                     category = UpgradeCategory.Slot,
                     effect = UpgradeEffect.SlotSuccessRate,
                     baseCost = 100,
-                    costMultiplier = 1.18f,
-                    maxLevel = 50,
-                    effectPerLevel = 2f,
+                    costMultiplier = 1.16f,  // 1.18 → 1.16
+                    maxLevel = 40,           // 50 → 40 (최대 60% 부스트)
+                    effectPerLevel = 1.5f,   // 2 → 1.5
                     effectFormat = "+{0}%"
                 },
                 new UpgradeData
@@ -203,9 +203,9 @@ namespace SlotClicker.Data
                     category = UpgradeCategory.Slot,
                     effect = UpgradeEffect.JackpotRate,
                     baseCost = 500,
-                    costMultiplier = 1.3f,
-                    maxLevel = 20,
-                    effectPerLevel = 5f,
+                    costMultiplier = 1.25f,  // 1.3 → 1.25
+                    maxLevel = 25,           // 20 → 25
+                    effectPerLevel = 3f,     // 5 → 3 (최대 75% 부스트)
                     effectFormat = "+{0}%"
                 },
                 new UpgradeData
@@ -216,9 +216,9 @@ namespace SlotClicker.Data
                     category = UpgradeCategory.Slot,
                     effect = UpgradeEffect.RewardMultiplier,
                     baseCost = 200,
-                    costMultiplier = 1.22f,
-                    maxLevel = -1,
-                    effectPerLevel = 5f,
+                    costMultiplier = 1.18f,  // 1.22 → 1.18
+                    maxLevel = 50,           // 무제한 → 50 (최대 150% 부스트)
+                    effectPerLevel = 3f,     // 5 → 3
                     effectFormat = "+{0}%"
                 }
             };
@@ -233,10 +233,10 @@ namespace SlotClicker.Data
                     description = "모든 골드 획득량 증가",
                     category = UpgradeCategory.Gold,
                     effect = UpgradeEffect.GoldBoost,
-                    baseCost = 150,
-                    costMultiplier = 1.2f,
+                    baseCost = 120,          // 150 → 120 (더 접근성 좋게)
+                    costMultiplier = 1.14f,  // 1.2 → 1.14 (클릭파워와 비슷하게)
                     maxLevel = -1,
-                    effectPerLevel = 10f,
+                    effectPerLevel = 12f,    // 10 → 12 (클릭파워와 균형)
                     effectFormat = "+{0}%"
                 },
                 new UpgradeData
@@ -246,10 +246,10 @@ namespace SlotClicker.Data
                     description = "초당 자동으로 골드 획득",
                     category = UpgradeCategory.Gold,
                     effect = UpgradeEffect.AutoCollect,
-                    baseCost = 1000,
-                    costMultiplier = 1.25f,
+                    baseCost = 500,          // 1000 → 500 (초반 접근성)
+                    costMultiplier = 1.18f,  // 1.25 → 1.18
                     maxLevel = -1,
-                    effectPerLevel = 0.1f,
+                    effectPerLevel = 1f,     // 0.1 → 1 (10배 증가!)
                     effectFormat = "+{0}/초"
                 },
                 new UpgradeData
@@ -260,7 +260,7 @@ namespace SlotClicker.Data
                     category = UpgradeCategory.Gold,
                     effect = UpgradeEffect.Interest,
                     baseCost = 5000,
-                    costMultiplier = 1.35f,
+                    costMultiplier = 1.30f,  // 1.35 → 1.30
                     maxLevel = 20,
                     effectPerLevel = 0.1f,
                     effectFormat = "+{0}%/초"
