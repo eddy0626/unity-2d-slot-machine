@@ -159,7 +159,8 @@ namespace SlotClicker.Core
             _playerData.totalGoldLost = 0;
             _playerData.totalClicks = 0;
             _playerData.totalSpins = 0;
-            _playerData.upgradeLevels.Clear();
+            _playerData.upgradeLevelsList.Clear();
+            _playerData.InitializeCache(); // 캐시도 초기화
 
             // 잭팟 카운트는 유지 (선택적)
             // _playerData.jackpotCount = 0;
