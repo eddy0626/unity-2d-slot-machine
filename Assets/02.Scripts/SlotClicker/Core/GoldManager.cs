@@ -70,17 +70,32 @@ namespace SlotClicker.Core
         }
 
         /// <summary>
-        /// 베팅 금액 계산 (비율 기반)
+        /// 베팅 금액 계산 (비율 기반, 최소/최대 제한 적용)
         /// </summary>
         public double CalculateBetAmount(float percentage)
         {
+            var config = _gameManager.Config;
+
+            // 비율 기반 베팅 계산
             double bet = _playerData.gold * percentage;
-            double minBet = _gameManager.Config.minimumBet;
 
             // 최소 베팅액 보장
-            if (bet < minBet && _playerData.gold >= minBet)
+            if (bet < config.minimumBet && _playerData.gold >= config.minimumBet)
             {
-                bet = minBet;
+                bet = config.minimumBet;
+            }
+
+            // 최대 베팅 제한 (절대값)
+            if (bet > config.maximumBet)
+            {
+                bet = config.maximumBet;
+            }
+
+            // 최대 베팅 비율 제한 (잔액의 일정 비율 이하)
+            double maxByPercentage = _playerData.gold * config.maxBetPercentage;
+            if (bet > maxByPercentage)
+            {
+                bet = maxByPercentage;
             }
 
             return Math.Floor(bet);

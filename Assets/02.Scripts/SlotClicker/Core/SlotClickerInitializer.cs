@@ -26,13 +26,10 @@ namespace SlotClicker.Core
                 GameObject managerObj = new GameObject("GameManager");
                 GameManager gameManager = managerObj.AddComponent<GameManager>();
 
-                // Config 설정 (직접 Inspector에서 설정 가능)
+                // Config 설정 (public setter 사용 - 리플렉션 제거)
                 if (_config != null)
                 {
-                    // Reflection으로 private 필드 설정 (또는 public setter 추가)
-                    var field = typeof(GameManager).GetField("_config",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    field?.SetValue(gameManager, _config);
+                    gameManager.SetConfig(_config);
                 }
             }
         }

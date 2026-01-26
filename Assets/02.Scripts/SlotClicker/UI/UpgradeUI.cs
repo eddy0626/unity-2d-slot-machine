@@ -32,6 +32,9 @@ namespace SlotClicker.UI
         private List<UpgradeItemUI> _upgradeItems = new List<UpgradeItemUI>();
         private bool _isInitialized = false;
 
+        // 이벤트 구독용 델리게이트 (메모리 누수 방지)
+        private Action<double> _onGoldChangedHandler;
+
         public void Initialize(GameManager gameManager)
         {
             _gameManager = gameManager;
@@ -43,9 +46,10 @@ namespace SlotClicker.UI
                 return;
             }
 
-            // 이벤트 등록
+            // 이벤트 등록 (델리게이트 저장으로 메모리 누수 방지)
             _upgradeManager.OnUpgradesChanged += RefreshUI;
-            _gameManager.Gold.OnGoldChanged += (_) => RefreshUI();
+            _onGoldChangedHandler = (_) => RefreshUI();
+            _gameManager.Gold.OnGoldChanged += _onGoldChangedHandler;
 
             _isInitialized = true;
 
@@ -59,8 +63,8 @@ namespace SlotClicker.UI
             if (_upgradeManager != null)
                 _upgradeManager.OnUpgradesChanged -= RefreshUI;
 
-            if (_gameManager?.Gold != null)
-                _gameManager.Gold.OnGoldChanged -= (_) => RefreshUI();
+            if (_gameManager?.Gold != null && _onGoldChangedHandler != null)
+                _gameManager.Gold.OnGoldChanged -= _onGoldChangedHandler;
         }
 
         private void CreateUpgradePanel()

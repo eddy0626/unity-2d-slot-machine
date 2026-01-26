@@ -11,6 +11,17 @@ namespace SlotClicker.Core
         [Header("설정")]
         [SerializeField] private GameConfig _config;
 
+        /// <summary>
+        /// Config 설정 (외부에서 초기화 전에 호출)
+        /// </summary>
+        public void SetConfig(GameConfig config)
+        {
+            if (!_isInitialized && config != null)
+            {
+                _config = config;
+            }
+        }
+
         [Header("상태")]
         [SerializeField] private bool _isInitialized = false;
 
@@ -100,10 +111,10 @@ namespace SlotClicker.Core
                     PlayerData = JsonUtility.FromJson<PlayerData>(savedData);
                     Debug.Log("[GameManager] Player data loaded.");
                 }
-                catch
+                catch (System.Exception ex)
                 {
                     PlayerData = new PlayerData();
-                    Debug.Log("[GameManager] Failed to load, creating new data.");
+                    Debug.LogWarning($"[GameManager] Failed to load save data: {ex.Message}. Creating new data.");
                 }
             }
             else

@@ -45,11 +45,33 @@ namespace SlotClicker.UI
         [SerializeField] private Button _upgradeButton;
         private UpgradeUI _upgradeUI;
 
+        [Header("=== 세션 통계 UI ===")]
+        [SerializeField] private TextMeshProUGUI _statsText;
+        [SerializeField] private TextMeshProUGUI _winRateText;
+        [SerializeField] private TextMeshProUGUI _prestigeProgressText;
+
         // 내부 상태
         private GameManager _game;
         private float _currentBetPercentage = 0.1f;
         private double _currentBetAmount = 0;
         private SpinUIState _spinState = SpinUIState.Ready;
+
+        // 세션 통계
+        private int _sessionSpins = 0;
+        private int _sessionWins = 0;
+        private double _sessionEarnings = 0;
+
+        // 골드 애니메이션
+        private double _displayedGold = 0;
+        private Tween _goldCountTween;
+
+        // 자동 스핀
+        private bool _isAutoSpinning = false;
+        private int _autoSpinCount = 0;
+        private int _autoSpinRemaining = 0;
+        private Button _autoSpinButton;
+        private TextMeshProUGUI _autoSpinText;
+        private readonly int[] _autoSpinOptions = { 10, 25, 50, 100 };
 
         // 클릭 이펙트 풀
         private GameObject _floatingTextPrefab;
@@ -92,7 +114,16 @@ namespace SlotClicker.UI
             }
 
             BindEvents();
+
+            // 초기 골드 값 설정 (애니메이션 없이)
+            _displayedGold = _game.Gold.CurrentGold;
+
+            // 자동 스핀 초기화
+            _autoSpinCount = _autoSpinOptions[0];
+
             UpdateUI();
+            UpdateStatistics();
+            UpdateAutoSpinButton();
             SetSpinState(SpinUIState.Ready);
         }
 
@@ -162,21 +193,42 @@ namespace SlotClicker.UI
                 new Vector2(0, 0), new Vector2(0, 0), new Color(0.1f, 0.1f, 0.15f, 0.95f));
             RectTransform hudRect = hudPanel.GetComponent<RectTransform>();
             hudRect.anchoredPosition = new Vector2(0, -60); // 상단에서 60px
-            hudRect.sizeDelta = new Vector2(0, 100);
+            hudRect.sizeDelta = new Vector2(0, 120); // 높이 증가
 
-            // 골드 표시
+            // 골드 표시 (상단 좌측)
             GameObject goldObj = CreateTextObject(hudRect, "GoldText", "GOLD: 0",
-                new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(40, 0), 32);
+                new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -15), 32);
             _goldText = goldObj.GetComponent<TextMeshProUGUI>();
             _goldText.color = new Color(1f, 0.85f, 0.2f);
             _goldText.alignment = TextAlignmentOptions.Left;
 
-            // 칩 표시
+            // 칩 표시 (상단 우측)
             GameObject chipsObj = CreateTextObject(hudRect, "ChipsText", "0 Chips",
-                new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-40, 0), 24);
+                new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -15), 24);
             _chipsText = chipsObj.GetComponent<TextMeshProUGUI>();
             _chipsText.color = new Color(0.6f, 0.8f, 1f);
             _chipsText.alignment = TextAlignmentOptions.Right;
+
+            // 세션 통계 (하단 좌측)
+            GameObject statsObj = CreateTextObject(hudRect, "StatsText", "Spins: 0 | Wins: 0",
+                new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 15), 16);
+            _statsText = statsObj.GetComponent<TextMeshProUGUI>();
+            _statsText.color = new Color(0.7f, 0.7f, 0.7f);
+            _statsText.alignment = TextAlignmentOptions.Left;
+
+            // 승률 표시 (하단 중앙)
+            GameObject winRateObj = CreateTextObject(hudRect, "WinRateText", "Win Rate: --",
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 15), 16);
+            _winRateText = winRateObj.GetComponent<TextMeshProUGUI>();
+            _winRateText.color = new Color(0.5f, 0.9f, 0.5f);
+            _winRateText.alignment = TextAlignmentOptions.Center;
+
+            // 프레스티지 진행률 (하단 우측)
+            GameObject prestigeObj = CreateTextObject(hudRect, "PrestigeText", "Prestige: 0%",
+                new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 15), 16);
+            _prestigeProgressText = prestigeObj.GetComponent<TextMeshProUGUI>();
+            _prestigeProgressText.color = new Color(0.9f, 0.6f, 1f);
+            _prestigeProgressText.alignment = TextAlignmentOptions.Right;
         }
 
         private void CreateSlotArea(RectTransform parent)
@@ -306,10 +358,10 @@ namespace SlotClicker.UI
                 _betButtons[i].onClick.AddListener(() => SetBetPercentage(betValue));
             }
 
-            // 스핀 버튼 - 하단에 배치
+            // 스핀 버튼 - 하단에 배치 (좌측으로 이동)
             GameObject spinObj = CreateButton(betRect, "SpinButton", "SPIN!",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(0, 45), new Vector2(250, 65),
+                new Vector2(-70, 45), new Vector2(200, 65),
                 new Color(0.8f, 0.2f, 0.2f));
             _spinButton = spinObj.GetComponent<Button>();
             _spinButton.onClick.AddListener(OnSpinClicked);
@@ -317,6 +369,18 @@ namespace SlotClicker.UI
             _spinButtonText = spinObj.GetComponentInChildren<TextMeshProUGUI>();
             _spinButtonText.fontSize = 28;
             _spinButtonText.fontStyle = FontStyles.Bold;
+
+            // 자동 스핀 버튼 - 스핀 버튼 우측에 배치
+            GameObject autoSpinObj = CreateButton(betRect, "AutoSpinButton", "AUTO\nx10",
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+                new Vector2(120, 45), new Vector2(100, 65),
+                new Color(0.3f, 0.5f, 0.7f));
+            _autoSpinButton = autoSpinObj.GetComponent<Button>();
+            _autoSpinButton.onClick.AddListener(OnAutoSpinClicked);
+
+            _autoSpinText = autoSpinObj.GetComponentInChildren<TextMeshProUGUI>();
+            _autoSpinText.fontSize = 18;
+            _autoSpinText.fontStyle = FontStyles.Bold;
         }
 
         private void CreateResultText(RectTransform parent)
@@ -595,6 +659,53 @@ namespace SlotClicker.UI
             _betAmountText.text = $"Bet: {GoldManager.FormatNumber(_currentBetAmount)}";
         }
 
+        private void UpdateStatistics()
+        {
+            if (_game == null) return;
+
+            // 세션 통계
+            if (_statsText != null)
+            {
+                _statsText.text = $"Spins: {_sessionSpins} | Wins: {_sessionWins}";
+            }
+
+            // 승률
+            if (_winRateText != null)
+            {
+                if (_sessionSpins > 0)
+                {
+                    float winRate = (float)_sessionWins / _sessionSpins * 100f;
+                    string earningsSign = _sessionEarnings >= 0 ? "+" : "";
+                    _winRateText.text = $"Win: {winRate:F1}% ({earningsSign}{GoldManager.FormatNumber(_sessionEarnings)})";
+                    _winRateText.color = _sessionEarnings >= 0 ? new Color(0.5f, 0.9f, 0.5f) : new Color(0.9f, 0.5f, 0.5f);
+                }
+                else
+                {
+                    _winRateText.text = "Win Rate: --";
+                }
+            }
+
+            // 프레스티지 진행률
+            if (_prestigeProgressText != null && _game.Config != null)
+            {
+                double threshold = _game.Config.prestigeThreshold;
+                double current = _game.PlayerData.totalGoldEarned;
+                float progress = Mathf.Clamp01((float)(current / threshold)) * 100f;
+
+                if (progress >= 100f)
+                {
+                    int chips = _game.CalculatePrestigeChips();
+                    _prestigeProgressText.text = $"Prestige: {chips} Chips!";
+                    _prestigeProgressText.color = new Color(1f, 0.8f, 0.2f);
+                }
+                else
+                {
+                    _prestigeProgressText.text = $"Prestige: {progress:F1}%";
+                    _prestigeProgressText.color = new Color(0.9f, 0.6f, 1f);
+                }
+            }
+        }
+
         private void SetSpinState(SpinUIState state)
         {
             _spinState = state;
@@ -655,9 +766,26 @@ namespace SlotClicker.UI
 
         private void OnGoldChanged(double newGold)
         {
-            _goldText.text = $"GOLD: {GoldManager.FormatNumber(newGold)}";
+            // 골드 카운팅 애니메이션
+            _goldCountTween?.Kill();
+
+            double startValue = _displayedGold;
+            double endValue = newGold;
+            float duration = Mathf.Clamp((float)Math.Abs(endValue - startValue) / 10000f, 0.2f, 1f);
+
+            _goldCountTween = DOTween.To(
+                () => _displayedGold,
+                x => {
+                    _displayedGold = x;
+                    _goldText.text = $"GOLD: {GoldManager.FormatNumber(_displayedGold)}";
+                },
+                endValue,
+                duration
+            ).SetEase(Ease.OutQuad);
+
             _goldText.transform.DOPunchScale(Vector3.one * 0.1f, 0.2f);
             UpdateBetAmount();
+            UpdateStatistics();
         }
 
         #endregion
@@ -790,6 +918,135 @@ namespace SlotClicker.UI
             }
         }
 
+        private float _lastAutoSpinClickTime = 0f;
+        private const float DOUBLE_CLICK_TIME = 0.3f;
+
+        private void OnAutoSpinClicked()
+        {
+            if (_isAutoSpinning)
+            {
+                // 자동 스핀 중이면 중지
+                StopAutoSpin();
+                return;
+            }
+
+            float currentTime = Time.time;
+
+            // 더블클릭 감지 - 자동 스핀 시작
+            if (currentTime - _lastAutoSpinClickTime < DOUBLE_CLICK_TIME)
+            {
+                StartAutoSpin();
+                _lastAutoSpinClickTime = 0f;
+                return;
+            }
+
+            _lastAutoSpinClickTime = currentTime;
+
+            // 자동 스핀 횟수 순환
+            int currentIndex = System.Array.IndexOf(_autoSpinOptions, _autoSpinCount);
+            currentIndex = (currentIndex + 1) % _autoSpinOptions.Length;
+            _autoSpinCount = _autoSpinOptions[currentIndex];
+
+            UpdateAutoSpinButton();
+            ShowToast($"Auto-spin: x{_autoSpinCount} (Double-tap to start)", new Color(0.7f, 0.7f, 0.9f), 1f);
+        }
+
+        public void StartAutoSpin()
+        {
+            if (_isAutoSpinning || _autoSpinCount <= 0) return;
+
+            _isAutoSpinning = true;
+            _autoSpinRemaining = _autoSpinCount;
+            UpdateAutoSpinButton();
+            StartCoroutine(AutoSpinCoroutine());
+        }
+
+        public void StopAutoSpin()
+        {
+            _isAutoSpinning = false;
+            _autoSpinRemaining = 0;
+            UpdateAutoSpinButton();
+            ShowToast("Auto-spin stopped", Color.yellow);
+        }
+
+        private System.Collections.IEnumerator AutoSpinCoroutine()
+        {
+            while (_isAutoSpinning && _autoSpinRemaining > 0)
+            {
+                // 스핀 중이면 대기
+                while (_game.Slot.IsSpinning)
+                {
+                    yield return null;
+                }
+
+                // 골드 부족 체크
+                if (_currentBetAmount <= 0 || !_game.Gold.CanAfford(_currentBetAmount))
+                {
+                    ShowToast("Auto-spin stopped: Not enough gold!", Color.red);
+                    StopAutoSpin();
+                    yield break;
+                }
+
+                // 스핀 실행
+                bool started = _game.Slot.TrySpin(_currentBetAmount);
+                if (started)
+                {
+                    _autoSpinRemaining--;
+                    UpdateAutoSpinButton();
+                }
+                else
+                {
+                    ShowToast("Auto-spin stopped: Cannot spin", Color.red);
+                    StopAutoSpin();
+                    yield break;
+                }
+
+                // 스핀 완료 대기
+                while (_game.Slot.IsSpinning)
+                {
+                    yield return null;
+                }
+
+                // 잭팟 당첨 시 중지
+                // (OnSlotSpinComplete에서 체크하여 StopAutoSpin 호출)
+
+                // 다음 스핀 전 짧은 딜레이
+                yield return new WaitForSeconds(0.5f);
+            }
+
+            if (_autoSpinRemaining <= 0)
+            {
+                ShowToast("Auto-spin completed!", new Color(0.5f, 0.9f, 0.5f));
+            }
+            _isAutoSpinning = false;
+            UpdateAutoSpinButton();
+        }
+
+        private void UpdateAutoSpinButton()
+        {
+            if (_autoSpinText == null) return;
+
+            if (_isAutoSpinning)
+            {
+                _autoSpinText.text = $"STOP\n({_autoSpinRemaining})";
+                _autoSpinButton.GetComponent<Image>().color = new Color(0.8f, 0.3f, 0.3f);
+            }
+            else
+            {
+                _autoSpinText.text = $"AUTO\nx{_autoSpinCount}";
+                _autoSpinButton.GetComponent<Image>().color = new Color(0.3f, 0.5f, 0.7f);
+            }
+        }
+
+        // 길게 눌러 자동 스핀 시작
+        public void OnAutoSpinHold()
+        {
+            if (!_isAutoSpinning)
+            {
+                StartAutoSpin();
+            }
+        }
+
         #endregion
 
         #region Slot Events
@@ -905,6 +1162,19 @@ namespace SlotClicker.UI
             SetBetButtonsInteractable(true);
             SetSpinState(SpinUIState.Result);
 
+            // 세션 통계 업데이트
+            _sessionSpins++;
+            if (result.IsWin)
+            {
+                _sessionWins++;
+                _sessionEarnings += result.FinalReward - result.BetAmount;
+            }
+            else
+            {
+                _sessionEarnings -= result.BetAmount;
+            }
+            UpdateStatistics();
+
             string message;
             Color color;
 
@@ -948,6 +1218,13 @@ namespace SlotClicker.UI
             if (highlightIndices.Length > 0)
             {
                 HighlightReels(highlightIndices, color);
+            }
+
+            // 잭팟 당첨 시 자동 스핀 중지
+            if (_isAutoSpinning && (result.Outcome == SlotOutcome.Jackpot || result.Outcome == SlotOutcome.MegaJackpot))
+            {
+                StopAutoSpin();
+                ShowToast("JACKPOT! Auto-spin stopped", new Color(1f, 0.8f, 0.2f));
             }
 
             DOVirtual.DelayedCall(1.2f, () => SetSpinState(SpinUIState.Ready));

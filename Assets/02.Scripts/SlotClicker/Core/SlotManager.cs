@@ -36,6 +36,10 @@ namespace SlotClicker.Core
         private bool _isSpinning = false;
         public bool IsSpinning => _isSpinning;
 
+        // 연패 추적
+        private int _currentLossStreak = 0;
+        public int CurrentLossStreak => _currentLossStreak;
+
         // 이벤트
         public event Action OnSpinStart;
         public event Action<SlotResult> OnSpinComplete;
@@ -104,9 +108,14 @@ namespace SlotClicker.Core
             // 최종 결과 처리
             yield return new WaitForSeconds(0.5f);
 
-            // 보상 지급
-            if (result.FinalReward > 0)
+            // 보상 지급 및 연패 추적
+            if (result.Outcome == SlotOutcome.Loss)
             {
+                _currentLossStreak++;
+            }
+            else
+            {
+                _currentLossStreak = 0; // 승리 시 연패 초기화
                 _gameManager.Gold.AddGold(result.FinalReward, false);
 
                 // 잭팟 카운트
@@ -161,13 +170,21 @@ namespace SlotClicker.Core
             // 잭팟 확률 업그레이드
             float jackpotBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.JackpotRate);
 
-            // 조정된 확률
+            // 연패 보호 보너스 (5연패 이상 시 발동)
+            float lossStreakBonus = 1f;
+            if (_config.enableLossStreakProtection && _currentLossStreak >= _config.lossStreakThreshold)
+            {
+                lossStreakBonus = 1f + _config.lossStreakBonusRate;
+                Debug.Log($"[SlotManager] Loss streak protection active! ({_currentLossStreak} losses, +{_config.lossStreakBonusRate * 100}% win rate)");
+            }
+
+            // 조정된 확률 (연패 보호 적용)
             float adjustedMegaJackpot = _config.megaJackpotRate * jackpotBonus;
             float adjustedJackpot = _config.jackpotRate * jackpotBonus;
-            float adjustedBigWin = _config.bigWinRate * successBonus;
-            float adjustedSmallWin = _config.smallWinRate * successBonus;
-            float adjustedMiniWin = _config.miniWinRate * successBonus;
-            float adjustedDraw = _config.drawRate;
+            float adjustedBigWin = _config.bigWinRate * successBonus * lossStreakBonus;
+            float adjustedSmallWin = _config.smallWinRate * successBonus * lossStreakBonus;
+            float adjustedMiniWin = _config.miniWinRate * successBonus * lossStreakBonus;
+            float adjustedDraw = _config.drawRate * lossStreakBonus;
 
             // 누적 확률
             float roll = UnityEngine.Random.Range(0f, 100f);
