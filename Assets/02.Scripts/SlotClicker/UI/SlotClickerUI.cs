@@ -25,7 +25,13 @@ namespace SlotClicker.UI
         [SerializeField] private Button[] _betButtons;
         [SerializeField] private TextMeshProUGUI _betAmountText;
         [SerializeField] private Button _spinButton;
+        [SerializeField] private TextMeshProUGUI _spinButtonText;
         [SerializeField] private TextMeshProUGUI _resultText;
+        [SerializeField] private GameObject _resultPanel;
+        [SerializeField] private CanvasGroup _resultGroup;
+        [SerializeField] private TextMeshProUGUI _spinStateText;
+        [SerializeField] private TextMeshProUGUI _toastText;
+        [SerializeField] private CanvasGroup _toastGroup;
 
         [Header("=== 심볼 스프라이트 ===")]
         [SerializeField] private Sprite[] _symbolSprites;
@@ -43,6 +49,7 @@ namespace SlotClicker.UI
         private GameManager _game;
         private float _currentBetPercentage = 0.1f;
         private double _currentBetAmount = 0;
+        private SpinUIState _spinState = SpinUIState.Ready;
 
         // 클릭 이펙트 풀
         private GameObject _floatingTextPrefab;
@@ -50,6 +57,19 @@ namespace SlotClicker.UI
         // 슬롯 스핀 관련
         private Coroutine[] _spinCoroutines = new Coroutine[3];
         private bool[] _isReelSpinning = new bool[3];
+        private Image[] _reelFrames = new Image[3];
+        private readonly Color _reelFrameBaseColor = new Color(0.2f, 0.15f, 0.25f, 1f);
+        private Tween _resultTween;
+        private Tween _toastTween;
+        private RectTransform _slotAreaRect;
+
+        private enum SpinUIState
+        {
+            Ready,
+            Spinning,
+            Stopping,
+            Result
+        }
 
         private void Start()
         {
@@ -73,6 +93,7 @@ namespace SlotClicker.UI
 
             BindEvents();
             UpdateUI();
+            SetSpinState(SpinUIState.Ready);
         }
 
         private void CreateUI()
@@ -119,6 +140,9 @@ namespace SlotClicker.UI
             // === 결과 텍스트 ===
             CreateResultText(canvasRect);
 
+            // === 토스트 메시지 ===
+            CreateToast(canvasRect);
+
             // === 플로팅 텍스트 프리팹 ===
             CreateFloatingTextPrefab();
 
@@ -141,7 +165,7 @@ namespace SlotClicker.UI
             hudRect.sizeDelta = new Vector2(0, 100);
 
             // 골드 표시
-            GameObject goldObj = CreateTextObject(hudRect, "GoldText", "0 Gold",
+            GameObject goldObj = CreateTextObject(hudRect, "GoldText", "GOLD: 0",
                 new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(40, 0), 32);
             _goldText = goldObj.GetComponent<TextMeshProUGUI>();
             _goldText.color = new Color(1f, 0.85f, 0.2f);
@@ -161,10 +185,18 @@ namespace SlotClicker.UI
             GameObject slotPanel = CreatePanel(parent, "SlotPanel", new Vector2(0.5f, 1), new Vector2(0.5f, 1),
                 new Vector2(0, -200), new Vector2(550, 180), new Color(0.15f, 0.1f, 0.2f, 1f));
             RectTransform slotRect = slotPanel.GetComponent<RectTransform>();
+            _slotAreaRect = slotRect;
 
             // 슬롯 프레임
             Image frameImg = slotPanel.GetComponent<Image>();
             AddOutline(slotPanel, new Color(0.8f, 0.6f, 0.2f), 4);
+
+            // 스핀 상태 텍스트
+            GameObject stateObj = CreateTextObject(slotRect, "SpinStateText", "READY",
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -10), 22);
+            _spinStateText = stateObj.GetComponent<TextMeshProUGUI>();
+            _spinStateText.color = new Color(0.8f, 0.8f, 0.9f);
+            _spinStateText.alignment = TextAlignmentOptions.Center;
 
             // 릴 심볼들
             _reelSymbols = new Image[3];
@@ -176,10 +208,11 @@ namespace SlotClicker.UI
                 GameObject reelBg = CreatePanel(slotRect, $"ReelBg_{i}",
                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                     new Vector2(startX + (i * spacing), 0), new Vector2(120, 120),
-                    new Color(0.2f, 0.15f, 0.25f, 1f));
+                    _reelFrameBaseColor);
 
                 // RectMask2D 사용 (Mask보다 간단하고 스프라이트 불필요)
                 reelBg.AddComponent<RectMask2D>();
+                _reelFrames[i] = reelBg.GetComponent<Image>();
 
                 GameObject symbolObj = new GameObject($"Symbol_{i}");
                 symbolObj.transform.SetParent(reelBg.transform, false);
@@ -228,6 +261,7 @@ namespace SlotClicker.UI
             TextMeshProUGUI tableTmp = tableText.GetComponent<TextMeshProUGUI>();
             tableTmp.color = new Color(1f, 0.9f, 0.6f, 0.8f);
             tableTmp.alignment = TextAlignmentOptions.Center;
+            tableTmp.raycastTarget = false;
 
             // 펄스 애니메이션
             tableTmp.transform.DOScale(1.05f, 0.8f).SetLoops(-1, LoopType.Yoyo).SetEase(Ease.InOutSine);
@@ -280,20 +314,51 @@ namespace SlotClicker.UI
             _spinButton = spinObj.GetComponent<Button>();
             _spinButton.onClick.AddListener(OnSpinClicked);
 
-            TextMeshProUGUI spinText = spinObj.GetComponentInChildren<TextMeshProUGUI>();
-            spinText.fontSize = 28;
-            spinText.fontStyle = FontStyles.Bold;
+            _spinButtonText = spinObj.GetComponentInChildren<TextMeshProUGUI>();
+            _spinButtonText.fontSize = 28;
+            _spinButtonText.fontStyle = FontStyles.Bold;
         }
 
         private void CreateResultText(RectTransform parent)
         {
-            // 결과 텍스트 - 클릭 영역 위에 표시
-            GameObject resultObj = CreateTextObject(parent, "ResultText", "",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 250), 40);
+            RectTransform resultParent = _slotAreaRect != null ? _slotAreaRect : parent;
+
+            // 결과 배너 - 슬롯 영역 하단 고정
+            _resultPanel = CreatePanel(resultParent, "ResultPanel",
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+                new Vector2(0, -35), new Vector2(520, 60),
+                new Color(0f, 0f, 0f, 0.6f));
+
+            RectTransform panelRect = _resultPanel.GetComponent<RectTransform>();
+            panelRect.pivot = new Vector2(0.5f, 1f);
+
+            _resultGroup = _resultPanel.AddComponent<CanvasGroup>();
+            _resultGroup.alpha = 0f;
+
+            GameObject resultObj = CreateTextObject(panelRect, "ResultText", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 36);
             _resultText = resultObj.GetComponent<TextMeshProUGUI>();
             _resultText.color = Color.white;
             _resultText.alignment = TextAlignmentOptions.Center;
-            _resultText.gameObject.SetActive(false);
+        }
+
+        private void CreateToast(RectTransform parent)
+        {
+            GameObject toastPanel = CreatePanel(parent, "ToastPanel",
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+                new Vector2(0, 320), new Vector2(520, 50),
+                new Color(0f, 0f, 0f, 0.6f));
+
+            _toastGroup = toastPanel.AddComponent<CanvasGroup>();
+            _toastGroup.alpha = 0f;
+
+            RectTransform panelRect = toastPanel.GetComponent<RectTransform>();
+
+            GameObject toastObj = CreateTextObject(panelRect, "ToastText", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 24);
+            _toastText = toastObj.GetComponent<TextMeshProUGUI>();
+            _toastText.color = Color.white;
+            _toastText.alignment = TextAlignmentOptions.Center;
         }
 
         private void CreateFloatingTextPrefab()
@@ -512,9 +577,16 @@ namespace SlotClicker.UI
         {
             if (_game == null) return;
 
-            _goldText.text = $"{_game.Gold.GetFormattedGold()} Gold";
+            _goldText.text = $"GOLD: {_game.Gold.GetFormattedGold()}";
             _chipsText.text = $"{_game.PlayerData.chips} Chips";
             UpdateBetAmount();
+
+            if (_game.Slot != null)
+            {
+                bool spinning = _game.Slot.IsSpinning;
+                _spinButton.interactable = !spinning;
+                SetBetButtonsInteractable(!spinning);
+            }
         }
 
         private void UpdateBetAmount()
@@ -523,9 +595,67 @@ namespace SlotClicker.UI
             _betAmountText.text = $"Bet: {GoldManager.FormatNumber(_currentBetAmount)}";
         }
 
+        private void SetSpinState(SpinUIState state)
+        {
+            _spinState = state;
+
+            if (_spinStateText != null)
+            {
+                switch (state)
+                {
+                    case SpinUIState.Ready:
+                        _spinStateText.text = "READY";
+                        _spinStateText.color = new Color(0.8f, 0.8f, 0.9f);
+                        break;
+                    case SpinUIState.Spinning:
+                        _spinStateText.text = "SPINNING...";
+                        _spinStateText.color = new Color(0.6f, 1f, 0.8f);
+                        break;
+                    case SpinUIState.Stopping:
+                        _spinStateText.text = "STOPPING...";
+                        _spinStateText.color = new Color(1f, 0.85f, 0.4f);
+                        break;
+                    case SpinUIState.Result:
+                        _spinStateText.text = "RESULT";
+                        _spinStateText.color = new Color(1f, 0.6f, 0.6f);
+                        break;
+                }
+
+                _spinStateText.transform.DOKill();
+                _spinStateText.transform.localScale = Vector3.one;
+                _spinStateText.transform.DOPunchScale(Vector3.one * 0.1f, 0.2f, 3, 0.5f);
+            }
+
+            UpdateSpinButtonState();
+        }
+
+        private void UpdateSpinButtonState()
+        {
+            if (_spinButtonText == null || _spinButton == null) return;
+
+            if (_spinState == SpinUIState.Spinning || _spinState == SpinUIState.Stopping)
+            {
+                _spinButtonText.text = "SPINNING";
+            }
+            else
+            {
+                _spinButtonText.text = "SPIN!";
+            }
+        }
+
+        private void SetBetButtonsInteractable(bool interactable)
+        {
+            if (_betButtons == null) return;
+            for (int i = 0; i < _betButtons.Length; i++)
+            {
+                if (_betButtons[i] != null)
+                    _betButtons[i].interactable = interactable;
+            }
+        }
+
         private void OnGoldChanged(double newGold)
         {
-            _goldText.text = $"{GoldManager.FormatNumber(newGold)} Gold";
+            _goldText.text = $"GOLD: {GoldManager.FormatNumber(newGold)}";
             _goldText.transform.DOPunchScale(Vector3.one * 0.1f, 0.2f);
             UpdateBetAmount();
         }
@@ -536,9 +666,19 @@ namespace SlotClicker.UI
 
         private void OnClickAreaClicked()
         {
-            // Input System 사용
-            Vector2 mousePos = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
-            _game.Click.ProcessClick(mousePos);
+            if (_game == null || _game.Click == null) return;
+
+            Vector2 screenPos = GetPointerScreenPosition();
+            if (screenPos == Vector2.zero && _clickArea != null)
+            {
+                Camera cam = _mainCanvas != null && _mainCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+                    ? _mainCanvas.worldCamera
+                    : null;
+                screenPos = RectTransformUtility.WorldToScreenPoint(cam, _clickArea.transform.position);
+            }
+
+            Vector2 localPos = ScreenToCanvasPosition(screenPos);
+            _game.Click.ProcessClick(localPos);
 
             // 클릭 피드백
             _clickArea.transform.DOPunchScale(Vector3.one * 0.05f, 0.1f);
@@ -556,7 +696,7 @@ namespace SlotClicker.UI
             floatText.SetActive(true);
 
             RectTransform rect = floatText.GetComponent<RectTransform>();
-            rect.position = position;
+            rect.anchoredPosition = position;
 
             TextMeshProUGUI tmp = floatText.GetComponent<TextMeshProUGUI>();
             tmp.text = $"+{GoldManager.FormatNumber(amount)}";
@@ -568,6 +708,46 @@ namespace SlotClicker.UI
             seq.Append(rect.DOAnchorPosY(rect.anchoredPosition.y + 100, 0.8f).SetEase(Ease.OutQuad));
             seq.Join(tmp.DOFade(0, 0.8f).SetEase(Ease.InQuad));
             seq.OnComplete(() => Destroy(floatText));
+        }
+
+        private Vector2 GetPointerScreenPosition()
+        {
+            if (Pointer.current != null)
+                return Pointer.current.position.ReadValue();
+            if (Mouse.current != null)
+                return Mouse.current.position.ReadValue();
+            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+                return Touchscreen.current.primaryTouch.position.ReadValue();
+
+            return Vector2.zero;
+        }
+
+        private Vector2 ScreenToCanvasPosition(Vector2 screenPosition)
+        {
+            if (_mainCanvas == null)
+                return screenPosition;
+
+            RectTransform canvasRect = _mainCanvas.transform as RectTransform;
+            Camera cam = _mainCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _mainCanvas.worldCamera;
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPosition, cam, out Vector2 localPoint))
+                return localPoint;
+
+            return screenPosition;
+        }
+
+        private void ShowToast(string message, Color color, float duration = 1.6f)
+        {
+            if (_toastText == null || _toastGroup == null) return;
+
+            _toastText.text = message;
+            _toastText.color = color;
+
+            _toastGroup.DOKill();
+            _toastGroup.alpha = 1f;
+
+            _toastTween?.Kill();
+            _toastTween = _toastGroup.DOFade(0f, 0.4f).SetDelay(duration);
         }
 
         private void SetBetPercentage(float percentage)
@@ -588,13 +768,26 @@ namespace SlotClicker.UI
 
         private void OnSpinClicked()
         {
-            if (_currentBetAmount <= 0)
+            if (_game == null || _game.Slot == null) return;
+
+            if (_game.Slot.IsSpinning)
             {
-                ShowResult("Not enough gold!", Color.red);
+                ShowToast("Spinning...", new Color(1f, 0.85f, 0.4f));
                 return;
             }
 
-            _game.Slot.TrySpin(_currentBetAmount);
+            if (_currentBetAmount <= 0 || !_game.Gold.CanAfford(_currentBetAmount))
+            {
+                ShowToast("Not enough gold!", Color.red);
+                _goldText?.transform.DOPunchScale(Vector3.one * 0.1f, 0.2f);
+                return;
+            }
+
+            bool started = _game.Slot.TrySpin(_currentBetAmount);
+            if (!started)
+            {
+                ShowToast("Cannot spin right now", Color.red);
+            }
         }
 
         #endregion
@@ -604,7 +797,19 @@ namespace SlotClicker.UI
         private void OnSlotSpinStart()
         {
             _spinButton.interactable = false;
-            _resultText.gameObject.SetActive(false);
+            SetBetButtonsInteractable(false);
+            SetSpinState(SpinUIState.Spinning);
+
+            if (_resultGroup != null)
+            {
+                _resultGroup.DOKill();
+                _resultGroup.alpha = 0f;
+            }
+            else if (_resultText != null)
+            {
+                _resultText.gameObject.SetActive(false);
+                _resultText.alpha = 1f;
+            }
 
             // 각 릴 스핀 애니메이션 시작
             for (int i = 0; i < _reelSymbols.Length; i++)
@@ -687,11 +892,18 @@ namespace SlotClicker.UI
                 _reelSymbols[reelIndex].DOColor(Color.white * 1.5f, 0.1f)
                     .OnComplete(() => _reelSymbols[reelIndex].DOColor(Color.white, 0.2f));
             }
+
+            if (_spinState == SpinUIState.Spinning)
+            {
+                SetSpinState(SpinUIState.Stopping);
+            }
         }
 
         private void OnSlotSpinComplete(SlotResult result)
         {
             _spinButton.interactable = true;
+            SetBetButtonsInteractable(true);
+            SetSpinState(SpinUIState.Result);
 
             string message;
             Color color;
@@ -731,26 +943,92 @@ namespace SlotClicker.UI
             }
 
             ShowResult(message, color);
+
+            int[] highlightIndices = GetWinningReelIndices(result);
+            if (highlightIndices.Length > 0)
+            {
+                HighlightReels(highlightIndices, color);
+            }
+
+            DOVirtual.DelayedCall(1.2f, () => SetSpinState(SpinUIState.Ready));
         }
 
         private void ShowResult(string message, Color color)
         {
+            if (_resultText == null) return;
+
             _resultText.text = message;
             _resultText.color = color;
-            _resultText.gameObject.SetActive(true);
 
-            _resultText.transform.localScale = Vector3.zero;
-            _resultText.transform.DOScale(1f, 0.3f).SetEase(Ease.OutBack);
-
-            // 3초 후 페이드아웃
-            DOVirtual.DelayedCall(3f, () =>
+            if (_resultGroup != null)
             {
-                _resultText.DOFade(0, 0.5f).OnComplete(() =>
+                _resultGroup.DOKill();
+                _resultGroup.alpha = 1f;
+                _resultText.transform.localScale = Vector3.one * 0.9f;
+                _resultText.transform.DOKill();
+                _resultText.transform.DOScale(1f, 0.25f).SetEase(Ease.OutBack);
+
+                _resultTween?.Kill();
+                _resultTween = _resultGroup.DOFade(0f, 0.5f).SetDelay(3f);
+            }
+            else
+            {
+                _resultText.gameObject.SetActive(true);
+                _resultText.transform.localScale = Vector3.zero;
+                _resultText.transform.DOScale(1f, 0.3f).SetEase(Ease.OutBack);
+
+                DOVirtual.DelayedCall(3f, () =>
                 {
-                    _resultText.gameObject.SetActive(false);
-                    _resultText.alpha = 1f;
+                    _resultText.DOFade(0, 0.5f).OnComplete(() =>
+                    {
+                        _resultText.gameObject.SetActive(false);
+                        _resultText.alpha = 1f;
+                    });
                 });
-            });
+            }
+        }
+
+        private int[] GetWinningReelIndices(SlotResult result)
+        {
+            if (result == null || result.Symbols == null || result.Symbols.Length < 3)
+                return Array.Empty<int>();
+
+            int a = result.Symbols[0];
+            int b = result.Symbols[1];
+            int c = result.Symbols[2];
+
+            if (a == b && b == c)
+                return new[] { 0, 1, 2 };
+
+            if (a == b) return new[] { 0, 1 };
+            if (b == c) return new[] { 1, 2 };
+            if (a == c) return new[] { 0, 2 };
+
+            return Array.Empty<int>();
+        }
+
+        private void HighlightReels(int[] indices, Color color)
+        {
+            for (int i = 0; i < indices.Length; i++)
+            {
+                int reelIndex = indices[i];
+                if (reelIndex < 0 || reelIndex >= _reelSymbols.Length) continue;
+
+                if (_reelSymbols[reelIndex] != null)
+                {
+                    _reelSymbols[reelIndex].transform.DOKill();
+                    _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.2f, 0.35f, 5, 0.6f);
+                }
+
+                if (_reelFrames[reelIndex] != null)
+                {
+                    Image frame = _reelFrames[reelIndex];
+                    Color original = frame.color;
+                    frame.DOKill();
+                    frame.DOColor(color, 0.12f).SetLoops(4, LoopType.Yoyo)
+                        .OnComplete(() => frame.color = original);
+                }
+            }
         }
 
         private void CelebrationEffect()
