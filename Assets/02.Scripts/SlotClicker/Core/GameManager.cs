@@ -114,6 +114,7 @@ namespace SlotClicker.Core
                 try
                 {
                     PlayerData = JsonUtility.FromJson<PlayerData>(savedData);
+                    PlayerData.InitializeCache(); // Dictionary 캐시 초기화
                     Debug.Log("[GameManager] Player data loaded.");
                 }
                 catch (System.Exception ex)

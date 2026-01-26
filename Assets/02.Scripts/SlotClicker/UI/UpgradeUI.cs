@@ -117,7 +117,7 @@ namespace SlotClicker.UI
             Text titleText = titleObj.AddComponent<Text>();
             titleText.text = "UPGRADES";
             titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            titleText.fontSize = 32;
+            titleText.fontSize = 42;
             titleText.fontStyle = FontStyle.Bold;
             titleText.color = Color.white;
             titleText.alignment = TextAnchor.MiddleCenter;
@@ -179,7 +179,7 @@ namespace SlotClicker.UI
             Text text = textObj.AddComponent<Text>();
             text.text = label;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 18;
+            text.fontSize = 26;
             text.fontStyle = FontStyle.Bold;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
@@ -281,7 +281,7 @@ namespace SlotClicker.UI
             Text text = textObj.AddComponent<Text>();
             text.text = "CLOSE";
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 20;
+            text.fontSize = 28;
             text.fontStyle = FontStyle.Bold;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
@@ -337,7 +337,7 @@ namespace SlotClicker.UI
             itemObj.transform.SetParent(_contentArea);
 
             RectTransform itemRect = itemObj.AddComponent<RectTransform>();
-            itemRect.sizeDelta = new Vector2(0, 80);
+            itemRect.sizeDelta = new Vector2(0, 100);
 
             Image itemBg = itemObj.AddComponent<Image>();
             itemBg.color = new Color(0.2f, 0.2f, 0.25f);
@@ -351,8 +351,8 @@ namespace SlotClicker.UI
             itemLayout.childControlHeight = true;
 
             LayoutElement itemLE = itemObj.AddComponent<LayoutElement>();
-            itemLE.minHeight = 80;
-            itemLE.preferredHeight = 80;
+            itemLE.minHeight = 100;
+            itemLE.preferredHeight = 100;
 
             // 정보 영역
             GameObject infoArea = CreateInfoArea(itemObj.transform, info);
@@ -392,7 +392,7 @@ namespace SlotClicker.UI
             Text nameText = nameObj.AddComponent<Text>();
             nameText.text = $"{info.Data.name}  Lv.{info.CurrentLevel}";
             nameText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            nameText.fontSize = 18;
+            nameText.fontSize = 24;
             nameText.fontStyle = FontStyle.Bold;
             nameText.color = Color.white;
 
@@ -403,7 +403,7 @@ namespace SlotClicker.UI
             Text descText = descObj.AddComponent<Text>();
             descText.text = info.Data.description;
             descText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            descText.fontSize = 14;
+            descText.fontSize = 20;
             descText.color = new Color(0.7f, 0.7f, 0.7f);
 
             // 효과
@@ -413,7 +413,7 @@ namespace SlotClicker.UI
             Text effectText = effectObj.AddComponent<Text>();
             effectText.text = $"효과: {info.Data.GetEffectDescription(info.CurrentLevel)}";
             effectText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            effectText.fontSize = 14;
+            effectText.fontSize = 20;
             effectText.color = new Color(0.4f, 0.8f, 0.4f);
 
             return infoObj;
@@ -457,7 +457,7 @@ namespace SlotClicker.UI
                 text.text = FormatGold(info.CurrentCost);
             }
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 16;
+            text.fontSize = 22;
             text.fontStyle = FontStyle.Bold;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;

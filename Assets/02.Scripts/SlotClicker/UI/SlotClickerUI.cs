@@ -207,35 +207,35 @@ namespace SlotClicker.UI
 
             // 골드 표시 (상단 좌측)
             GameObject goldObj = CreateTextObject(hudRect, "GoldText", "GOLD: 0",
-                new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -15), 32);
+                new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -15), 42);
             _goldText = goldObj.GetComponent<TextMeshProUGUI>();
             _goldText.color = new Color(1f, 0.85f, 0.2f);
             _goldText.alignment = TextAlignmentOptions.Left;
 
             // 칩 표시 (상단 우측)
             GameObject chipsObj = CreateTextObject(hudRect, "ChipsText", "0 Chips",
-                new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -15), 24);
+                new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -15), 32);
             _chipsText = chipsObj.GetComponent<TextMeshProUGUI>();
             _chipsText.color = new Color(0.6f, 0.8f, 1f);
             _chipsText.alignment = TextAlignmentOptions.Right;
 
             // 세션 통계 (하단 좌측)
             GameObject statsObj = CreateTextObject(hudRect, "StatsText", "Spins: 0 | Wins: 0",
-                new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 15), 16);
+                new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 15), 22);
             _statsText = statsObj.GetComponent<TextMeshProUGUI>();
             _statsText.color = new Color(0.7f, 0.7f, 0.7f);
             _statsText.alignment = TextAlignmentOptions.Left;
 
             // 승률 표시 (하단 중앙)
             GameObject winRateObj = CreateTextObject(hudRect, "WinRateText", "Win Rate: --",
-                new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 15), 16);
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 15), 22);
             _winRateText = winRateObj.GetComponent<TextMeshProUGUI>();
             _winRateText.color = new Color(0.5f, 0.9f, 0.5f);
             _winRateText.alignment = TextAlignmentOptions.Center;
 
             // 프레스티지 진행률 (하단 우측)
             GameObject prestigeObj = CreateTextObject(hudRect, "PrestigeText", "Prestige: 0%",
-                new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 15), 16);
+                new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 15), 22);
             _prestigeProgressText = prestigeObj.GetComponent<TextMeshProUGUI>();
             _prestigeProgressText.color = new Color(0.9f, 0.6f, 1f);
             _prestigeProgressText.alignment = TextAlignmentOptions.Right;
@@ -255,7 +255,7 @@ namespace SlotClicker.UI
 
             // 스핀 상태 텍스트
             GameObject stateObj = CreateTextObject(slotRect, "SpinStateText", "READY",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -10), 22);
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -10), 28);
             _spinStateText = stateObj.GetComponent<TextMeshProUGUI>();
             _spinStateText.color = new Color(0.8f, 0.8f, 0.9f);
             _spinStateText.alignment = TextAlignmentOptions.Center;
@@ -319,7 +319,7 @@ namespace SlotClicker.UI
 
             // 테이블 텍스트
             GameObject tableText = CreateTextObject(clickRect, "TableText", "TAP TO EARN",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 40);
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 48);
             TextMeshProUGUI tableTmp = tableText.GetComponent<TextMeshProUGUI>();
             tableTmp.color = new Color(1f, 0.9f, 0.6f, 0.8f);
             tableTmp.alignment = TextAlignmentOptions.Center;
@@ -339,7 +339,7 @@ namespace SlotClicker.UI
 
             // 현재 베팅액 표시
             GameObject betAmountObj = CreateTextObject(betRect, "BetAmountText", "Bet: 0",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -15), 26);
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -15), 34);
             _betAmountText = betAmountObj.GetComponent<TextMeshProUGUI>();
             _betAmountText.color = Color.white;
             _betAmountText.alignment = TextAlignmentOptions.Center;
@@ -377,7 +377,7 @@ namespace SlotClicker.UI
             _spinButton.onClick.AddListener(OnSpinClicked);
 
             _spinButtonText = spinObj.GetComponentInChildren<TextMeshProUGUI>();
-            _spinButtonText.fontSize = 28;
+            _spinButtonText.fontSize = 36;
             _spinButtonText.fontStyle = FontStyles.Bold;
 
             // 자동 스핀 버튼 - 스핀 버튼 우측에 배치
@@ -389,7 +389,7 @@ namespace SlotClicker.UI
             _autoSpinButton.onClick.AddListener(OnAutoSpinClicked);
 
             _autoSpinText = autoSpinObj.GetComponentInChildren<TextMeshProUGUI>();
-            _autoSpinText.fontSize = 18;
+            _autoSpinText.fontSize = 24;
             _autoSpinText.fontStyle = FontStyles.Bold;
         }
 
@@ -410,7 +410,7 @@ namespace SlotClicker.UI
             _resultGroup.alpha = 0f;
 
             GameObject resultObj = CreateTextObject(panelRect, "ResultText", "",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 36);
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 44);
             _resultText = resultObj.GetComponent<TextMeshProUGUI>();
             _resultText.color = Color.white;
             _resultText.alignment = TextAlignmentOptions.Center;
@@ -429,7 +429,7 @@ namespace SlotClicker.UI
             RectTransform panelRect = toastPanel.GetComponent<RectTransform>();
 
             GameObject toastObj = CreateTextObject(panelRect, "ToastText", "",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 24);
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 32);
             _toastText = toastObj.GetComponent<TextMeshProUGUI>();
             _toastText.color = Color.white;
             _toastText.alignment = TextAlignmentOptions.Center;
@@ -444,7 +444,7 @@ namespace SlotClicker.UI
             rect.sizeDelta = new Vector2(200, 50);
 
             TextMeshProUGUI tmp = _floatingTextPrefab.AddComponent<TextMeshProUGUI>();
-            tmp.fontSize = 32;
+            tmp.fontSize = 40;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = Color.yellow;
@@ -504,7 +504,7 @@ namespace SlotClicker.UI
             btn.colors = colors;
 
             GameObject textObj = CreateTextObject(btnObj.GetComponent<RectTransform>(), "Label", label,
-                Vector2.zero, Vector2.one, Vector2.zero, 24);
+                Vector2.zero, Vector2.one, Vector2.zero, 30);
             RectTransform textRect = textObj.GetComponent<RectTransform>();
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
@@ -886,7 +886,7 @@ namespace SlotClicker.UI
             TextMeshProUGUI tmp = floatText.GetComponent<TextMeshProUGUI>();
             tmp.text = $"+{GoldManager.FormatNumber(amount)}";
             tmp.color = isCritical ? _criticalColor : Color.yellow;
-            tmp.fontSize = isCritical ? 42 : 32;
+            tmp.fontSize = isCritical ? 52 : 40;
 
             // 애니메이션
             Sequence seq = DOTween.Sequence();

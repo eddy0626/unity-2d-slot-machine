@@ -4,6 +4,24 @@ using UnityEngine;
 
 namespace SlotClicker.Data
 {
+    /// <summary>
+    /// JsonUtility로 직렬화 가능한 업그레이드 레벨 항목
+    /// </summary>
+    [System.Serializable]
+    public class UpgradeLevelEntry
+    {
+        public string upgradeId;
+        public int level;
+
+        public UpgradeLevelEntry() { }
+
+        public UpgradeLevelEntry(string id, int lvl)
+        {
+            upgradeId = id;
+            level = lvl;
+        }
+    }
+
     [System.Serializable]
     public class PlayerData
     {
@@ -23,8 +41,12 @@ namespace SlotClicker.Data
         public int prestigeCount;
         public List<string> ownedLuckyCharms = new List<string>();
 
-        // 업그레이드 레벨
-        public Dictionary<string, int> upgradeLevels = new Dictionary<string, int>();
+        // 업그레이드 레벨 (JsonUtility 직렬화 가능한 List 사용)
+        public List<UpgradeLevelEntry> upgradeLevelsList = new List<UpgradeLevelEntry>();
+
+        // 런타임 캐시용 Dictionary (직렬화 제외)
+        [NonSerialized]
+        private Dictionary<string, int> _upgradeLevelsCache;
 
         // 메타
         public string lastPlayTime;
@@ -42,16 +64,46 @@ namespace SlotClicker.Data
             megaJackpotCount = 0;
             prestigeCount = 0;
             lastPlayTime = DateTime.Now.ToString("o");
+            _upgradeLevelsCache = new Dictionary<string, int>();
+        }
+
+        /// <summary>
+        /// 로드 후 캐시 초기화
+        /// </summary>
+        public void InitializeCache()
+        {
+            _upgradeLevelsCache = new Dictionary<string, int>();
+            foreach (var entry in upgradeLevelsList)
+            {
+                _upgradeLevelsCache[entry.upgradeId] = entry.level;
+            }
         }
 
         public int GetUpgradeLevel(string upgradeId)
         {
-            return upgradeLevels.TryGetValue(upgradeId, out int level) ? level : 0;
+            if (_upgradeLevelsCache == null)
+                InitializeCache();
+
+            return _upgradeLevelsCache.TryGetValue(upgradeId, out int level) ? level : 0;
         }
 
         public void SetUpgradeLevel(string upgradeId, int level)
         {
-            upgradeLevels[upgradeId] = level;
+            if (_upgradeLevelsCache == null)
+                _upgradeLevelsCache = new Dictionary<string, int>();
+
+            _upgradeLevelsCache[upgradeId] = level;
+
+            // List도 동기화
+            var existing = upgradeLevelsList.Find(e => e.upgradeId == upgradeId);
+            if (existing != null)
+            {
+                existing.level = level;
+            }
+            else
+            {
+                upgradeLevelsList.Add(new UpgradeLevelEntry(upgradeId, level));
+            }
         }
     }
 }
