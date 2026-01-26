@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 44844e5524bb54a44a9cf0e5e01b68f5, type: 3}
+  m_Name: SlotMachineConfig
+  m_EditorClassIdentifier: Assembly-CSharp::SlotMachine.Data.SlotMachineConfig
+  initialCoins: 10000
+  betAmounts: 0a000000190000003200000064000000fa000000f4010000
+  defaultBetIndex: 2
+  reelCount: 3
+  visibleSymbolsPerReel: 3
+  symbolHeight: 150
+  spinSpeed: 2000
+  spinDuration: 2
+  reelStopDelay: 0.4
+  bounceAmount: 15
+  bounceDuration: 0.2
+  symbols:
+  - {fileID: 11400000, guid: b7541ac5e6c090647a0545baee880625, type: 2}
+  - {fileID: 11400000, guid: 038c2fdb2b9953f4da65e305b3c1b7cb, type: 2}
+  - {fileID: 11400000, guid: 3bc4dca45b8431940a0a88ddd160dc6a, type: 2}
+  - {fileID: 11400000, guid: 6840c422cf537ef4681c489f9fac2112, type: 2}
+  - {fileID: 11400000, guid: e8d9d072f411093499f64def878cba41, type: 2}
+  - {fileID: 11400000, guid: 22e39c1b82407ad45b1d8250c6b0beed, type: 2}
+  - {fileID: 11400000, guid: fdda7138ea2aa73409420b88c96a7272, type: 2}
+  - {fileID: 11400000, guid: 5ed2d98e6c55d3444a55104a8dccc7ec, type: 2}
+  - {fileID: 11400000, guid: 7c676b2c1cc29a5408a70952c6a03f4e, type: 2}
+  - {fileID: 11400000, guid: 7b9ce5b0602b27243aae44fb722deaa0, type: 2}
+  - {fileID: 11400000, guid: 1012ee3370bd2d04a9870ca70db88100, type: 2}
+  - {fileID: 11400000, guid: 83057493c9303c0458a283985b92c662, type: 2}
+  - {fileID: 11400000, guid: 7e2b6bceec6b1f147a37de9beefa2019, type: 2}
+  - {fileID: 11400000, guid: 97c5e0b39f83aa7429369db61212fd9e, type: 2}
+  - {fileID: 11400000, guid: 4e8fd8ec6b7834b41897ba6b34b7d4fc, type: 2}
+  - {fileID: 11400000, guid: 2fe4bc69981991943a0fb47f9e9eec6b, type: 2}
+  scatterBonusMultiplier: 10
+  wildSymbolId: 12
+  scatterSymbolId: 13

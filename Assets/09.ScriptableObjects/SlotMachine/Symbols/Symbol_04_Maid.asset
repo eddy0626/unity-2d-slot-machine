@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7ee27ef13baf5843a3395f85558c0f9, type: 3}
+  m_Name: Symbol_04_Maid
+  m_EditorClassIdentifier: Assembly-CSharp::SlotMachine.Data.SymbolData
+  symbolName: Maid
+  symbolId: 4
+  sprite: {fileID: 501847308, guid: 57eb6e320439b554e90ecbcd491358ac, type: 3}
+  symbolType: 0
+  payoutMultiplier: 20
+  weight: 10
+  glowColor: {r: 0.8, g: 0.9, b: 1, a: 1}
