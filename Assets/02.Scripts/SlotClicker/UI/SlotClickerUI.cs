@@ -2,6 +2,8 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using TMPro;
 using DG.Tweening;
 using SlotClicker.Core;
@@ -76,8 +78,8 @@ namespace SlotClicker.UI
             {
                 GameObject eventSystemObj = new GameObject("EventSystem");
                 eventSystemObj.AddComponent<EventSystem>();
-                eventSystemObj.AddComponent<StandaloneInputModule>();
-                Debug.Log("[SlotClickerUI] EventSystem created");
+                eventSystemObj.AddComponent<InputSystemUIInputModule>(); // Input System 패키지용
+                Debug.Log("[SlotClickerUI] EventSystem created (Input System)");
             }
 
             // 캔버스 생성
@@ -464,7 +466,8 @@ namespace SlotClicker.UI
 
         private void OnClickAreaClicked()
         {
-            Vector2 mousePos = Input.mousePosition;
+            // Input System 사용
+            Vector2 mousePos = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
             _game.Click.ProcessClick(mousePos);
 
             // 클릭 피드백
