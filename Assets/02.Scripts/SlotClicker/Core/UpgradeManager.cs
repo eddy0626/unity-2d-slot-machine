@@ -256,7 +256,10 @@ namespace SlotClicker.Core
                 double goldBoost = GetEffectMultiplier(UpgradeEffect.GoldBoost);
                 double prestigeBonus = _gameManager.GetPrestigeBonus();
 
-                double autoGold = baseAmount * goldBoost * prestigeBonus;
+                // 럭키참 보너스 적용
+                double charmBonus = _gameManager.Prestige?.GetAutoCollectMultiplier() ?? 1f;
+
+                double autoGold = baseAmount * goldBoost * prestigeBonus * charmBonus;
                 _gameManager.Gold.AddGold(autoGold, false);
             }
         }
@@ -266,9 +269,13 @@ namespace SlotClicker.Core
             float interestRate = GetEffectValue(UpgradeEffect.Interest);
             if (interestRate <= 0) return;
 
+            // 럭키참 보너스 적용
+            float charmBonus = _gameManager.Prestige?.GetInterestMultiplier() ?? 1f;
+            float adjustedRate = interestRate * charmBonus;
+
             // 이자는 프레임당 계산 (초당 비율을 프레임으로 나눔)
             double currentGold = _gameManager.Gold.CurrentGold;
-            double interest = currentGold * (interestRate / 100f) * Time.deltaTime;
+            double interest = currentGold * (adjustedRate / 100f) * Time.deltaTime;
 
             if (interest > 0.01) // 최소 이자
             {

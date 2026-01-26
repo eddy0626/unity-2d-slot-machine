@@ -170,6 +170,13 @@ namespace SlotClicker.Core
             // 잭팟 확률 업그레이드
             float jackpotBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.JackpotRate);
 
+            // 럭키참 보너스 적용
+            float slotCharmBonus = _gameManager.Prestige?.GetSlotSuccessMultiplier() ?? 1f;
+            float jackpotCharmBonus = _gameManager.Prestige?.GetJackpotRateMultiplier() ?? 1f;
+
+            successBonus *= slotCharmBonus;
+            jackpotBonus *= jackpotCharmBonus;
+
             // 연패 보호 보너스 (5연패 이상 시 발동)
             float lossStreakBonus = 1f;
             if (_config.enableLossStreakProtection && _currentLossStreak >= _config.lossStreakThreshold)
@@ -310,7 +317,8 @@ namespace SlotClicker.Core
         public float GetCurrentJackpotRate()
         {
             float jackpotBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.JackpotRate);
-            return _config.jackpotRate * jackpotBonus;
+            float charmBonus = _gameManager.Prestige?.GetJackpotRateMultiplier() ?? 1f;
+            return _config.jackpotRate * jackpotBonus * charmBonus;
         }
 
         /// <summary>
@@ -319,7 +327,8 @@ namespace SlotClicker.Core
         public float GetCurrentMegaJackpotRate()
         {
             float jackpotBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.JackpotRate);
-            return _config.megaJackpotRate * jackpotBonus;
+            float charmBonus = _gameManager.Prestige?.GetJackpotRateMultiplier() ?? 1f;
+            return _config.megaJackpotRate * jackpotBonus * charmBonus;
         }
     }
 }

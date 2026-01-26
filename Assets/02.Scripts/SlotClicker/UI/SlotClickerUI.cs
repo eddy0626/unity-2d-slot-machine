@@ -45,6 +45,10 @@ namespace SlotClicker.UI
         [SerializeField] private Button _upgradeButton;
         private UpgradeUI _upgradeUI;
 
+        [Header("=== 프레스티지 UI ===")]
+        [SerializeField] private Button _prestigeButton;
+        private PrestigeUI _prestigeUI;
+
         [Header("=== 세션 통계 UI ===")]
         [SerializeField] private TextMeshProUGUI _statsText;
         [SerializeField] private TextMeshProUGUI _winRateText;
@@ -182,6 +186,12 @@ namespace SlotClicker.UI
 
             // === 업그레이드 UI ===
             CreateUpgradeUI();
+
+            // === 프레스티지 버튼 ===
+            CreatePrestigeButton(canvasRect);
+
+            // === 프레스티지 UI ===
+            CreatePrestigeUI();
 
             Debug.Log("[SlotClickerUI] UI created successfully!");
         }
@@ -604,6 +614,51 @@ namespace SlotClicker.UI
             }
         }
 
+        private void CreatePrestigeButton(RectTransform parent)
+        {
+            // 프레스티지 버튼 (화면 왼쪽 상단, HUD 바로 아래)
+            GameObject btnObj = CreateButton(parent, "PrestigeButton", "PRESTIGE",
+                new Vector2(0, 1), new Vector2(0, 1),
+                new Vector2(100, -140), new Vector2(160, 50),
+                new Color(0.6f, 0.3f, 0.6f));
+
+            _prestigeButton = btnObj.GetComponent<Button>();
+            _prestigeButton.onClick.AddListener(OnPrestigeButtonClicked);
+
+            // 아이콘 효과 (반짝임)
+            btnObj.transform.DOScale(1.05f, 0.6f)
+                .SetLoops(-1, LoopType.Yoyo)
+                .SetEase(Ease.InOutSine);
+        }
+
+        private void CreatePrestigeUI()
+        {
+            GameObject prestigeUIObj = new GameObject("PrestigeUI");
+            prestigeUIObj.transform.SetParent(_mainCanvas.transform, false);
+
+            RectTransform rect = prestigeUIObj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.05f, 0.1f);
+            rect.anchorMax = new Vector2(0.95f, 0.9f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            // 배경 패널
+            Image bg = prestigeUIObj.AddComponent<Image>();
+            bg.color = new Color(0.1f, 0.08f, 0.15f, 0.98f);
+
+            _prestigeUI = prestigeUIObj.AddComponent<PrestigeUI>();
+            _prestigeUI.Initialize(_game);
+            _prestigeUI.Hide();
+        }
+
+        private void OnPrestigeButtonClicked()
+        {
+            if (_prestigeUI != null)
+            {
+                _prestigeUI.Toggle();
+            }
+        }
+
         #endregion
 
         #region Event Binding
@@ -642,7 +697,8 @@ namespace SlotClicker.UI
             if (_game == null) return;
 
             _goldText.text = $"GOLD: {_game.Gold.GetFormattedGold()}";
-            _chipsText.text = $"{_game.PlayerData.chips} Chips";
+            int chips = _game.Prestige?.TotalChips ?? _game.PlayerData.chips;
+            _chipsText.text = $"{chips} Chips";
             UpdateBetAmount();
 
             if (_game.Slot != null)
@@ -686,21 +742,22 @@ namespace SlotClicker.UI
             }
 
             // 프레스티지 진행률
-            if (_prestigeProgressText != null && _game.Config != null)
+            if (_prestigeProgressText != null && _game.Prestige != null)
             {
-                double threshold = _game.Config.prestigeThreshold;
-                double current = _game.PlayerData.totalGoldEarned;
-                float progress = Mathf.Clamp01((float)(current / threshold)) * 100f;
+                int chips = _game.Prestige.CalculateChipsToGain();
+                string vipRank = _game.Prestige.GetVIPRankName(_game.Prestige.CurrentVIPRank);
 
-                if (progress >= 100f)
+                if (chips > 0)
                 {
-                    int chips = _game.CalculatePrestigeChips();
-                    _prestigeProgressText.text = $"Prestige: {chips} Chips!";
+                    _prestigeProgressText.text = $"{vipRank} | +{chips} Chips";
                     _prestigeProgressText.color = new Color(1f, 0.8f, 0.2f);
                 }
                 else
                 {
-                    _prestigeProgressText.text = $"Prestige: {progress:F1}%";
+                    double threshold = 1_000_000; // 1M
+                    double current = _game.PlayerData.totalGoldEarned;
+                    float progress = Mathf.Clamp01((float)(current / threshold)) * 100f;
+                    _prestigeProgressText.text = $"{vipRank} | {progress:F1}%";
                     _prestigeProgressText.color = new Color(0.9f, 0.6f, 1f);
                 }
             }

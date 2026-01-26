@@ -41,8 +41,12 @@ namespace SlotClicker.Core
             // 골드 부스트 적용
             double goldBoost = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.GoldBoost);
 
+            // 럭키참 보너스 적용
+            double clickCharmBonus = _gameManager.Prestige?.GetClickGoldMultiplier() ?? 1f;
+            double goldCharmBonus = _gameManager.Prestige?.GetGoldBoostMultiplier() ?? 1f;
+
             // 최종 기본 골드
-            double baseGold = basePower * upgradeMultiplier * prestigeBonus * goldBoost;
+            double baseGold = basePower * upgradeMultiplier * prestigeBonus * goldBoost * clickCharmBonus * goldCharmBonus;
 
             // 크리티컬 판정
             bool isCritical = CheckCritical();
@@ -110,7 +114,11 @@ namespace SlotClicker.Core
             // 기본 확률 + 업그레이드 효과 (%)
             float baseChance = _config.criticalChance;
             float upgradeBonus = _gameManager.Upgrade.GetEffectValue(UpgradeEffect.CriticalChance) / 100f;
-            return Mathf.Min(baseChance + upgradeBonus, 0.5f); // 최대 50%
+
+            // 럭키참 보너스 (직접 % 추가)
+            float charmBonus = (_gameManager.Prestige?.GetCriticalBonusValue() ?? 0f) / 100f;
+
+            return Mathf.Min(baseChance + upgradeBonus + charmBonus, 0.5f); // 최대 50%
         }
 
         /// <summary>

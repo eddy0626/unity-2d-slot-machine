@@ -30,6 +30,7 @@ namespace SlotClicker.Core
         public ClickManager Click { get; private set; }
         public SlotManager Slot { get; private set; }
         public UpgradeManager Upgrade { get; private set; }
+        public PrestigeManager Prestige { get; private set; }
 
         // 플레이어 데이터
         public PlayerData PlayerData { get; private set; }
@@ -97,6 +98,10 @@ namespace SlotClicker.Core
             // SlotManager 초기화 (UpgradeManager 효과 사용)
             Slot = gameObject.AddComponent<SlotManager>();
             Slot.Initialize(this);
+
+            // PrestigeManager 초기화
+            Prestige = gameObject.AddComponent<PrestigeManager>();
+            Prestige.Initialize(this);
         }
 
         private void LoadPlayerData()
@@ -161,6 +166,8 @@ namespace SlotClicker.Core
 
         public float GetPrestigeBonus()
         {
+            if (Prestige != null)
+                return Prestige.GetTotalPrestigeMultiplier();
             return 1f + (PlayerData.chips * _config.prestigeBonusPerChip);
         }
     }
