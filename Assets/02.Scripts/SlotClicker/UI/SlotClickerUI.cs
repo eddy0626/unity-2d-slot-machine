@@ -16,20 +16,34 @@ namespace SlotClicker.UI
         [Header("=== 자동 생성 ===")]
         [SerializeField] private bool _autoCreateUI = true;
 
-        [Header("=== UI 참조 ===")]
+        [Header("=== UI 참조 (Canvas) ===")]
         [SerializeField] private Canvas _mainCanvas;
+
+        [Header("=== HUD 참조 ===")]
         [SerializeField] private TextMeshProUGUI _goldText;
         [SerializeField] private TextMeshProUGUI _chipsText;
+
+        [Header("=== 클릭 영역 ===")]
         [SerializeField] private Button _clickArea;
+
+        [Header("=== 슬롯 영역 ===")]
+        [SerializeField] private RectTransform _slotPanel;
         [SerializeField] private Image[] _reelSymbols;
+        [SerializeField] private Image[] _reelFramesRef;
+        [SerializeField] private TextMeshProUGUI _spinStateText;
+
+        [Header("=== 베팅 UI ===")]
         [SerializeField] private Button[] _betButtons;
         [SerializeField] private TextMeshProUGUI _betAmountText;
         [SerializeField] private Button _spinButton;
         [SerializeField] private TextMeshProUGUI _spinButtonText;
+        [SerializeField] private Button _autoSpinButtonRef;
+        [SerializeField] private TextMeshProUGUI _autoSpinTextRef;
+
+        [Header("=== 결과/토스트 ===")]
         [SerializeField] private TextMeshProUGUI _resultText;
         [SerializeField] private GameObject _resultPanel;
         [SerializeField] private CanvasGroup _resultGroup;
-        [SerializeField] private TextMeshProUGUI _spinStateText;
         [SerializeField] private TextMeshProUGUI _toastText;
         [SerializeField] private CanvasGroup _toastGroup;
 
@@ -116,6 +130,11 @@ namespace SlotClicker.UI
             {
                 CreateUI();
             }
+            else
+            {
+                // 에디터에서 설정한 참조 사용
+                SetupExistingUI();
+            }
 
             BindEvents();
 
@@ -129,6 +148,126 @@ namespace SlotClicker.UI
             UpdateStatistics();
             UpdateAutoSpinButton();
             SetSpinState(SpinUIState.Ready);
+        }
+
+        /// <summary>
+        /// 에디터에서 설정한 UI 참조를 사용하여 초기화
+        /// </summary>
+        private void SetupExistingUI()
+        {
+            // Canvas 확인
+            if (_mainCanvas == null)
+            {
+                _mainCanvas = GetComponent<Canvas>();
+                if (_mainCanvas == null)
+                {
+                    Debug.LogError("[SlotClickerUI] Canvas not found! Please assign the Canvas reference.");
+                    return;
+                }
+            }
+
+            // 스프라이트 로드
+            LoadSymbolSprites();
+
+            // 슬롯 영역 설정
+            if (_slotPanel != null)
+            {
+                _slotAreaRect = _slotPanel;
+            }
+
+            // 릴 프레임 참조 설정
+            if (_reelFramesRef != null && _reelFramesRef.Length > 0)
+            {
+                _reelFrames = _reelFramesRef;
+            }
+            else if (_reelSymbols != null)
+            {
+                // 심볼의 부모에서 프레임 이미지 찾기
+                for (int i = 0; i < _reelSymbols.Length && i < _reelFrames.Length; i++)
+                {
+                    if (_reelSymbols[i] != null && _reelSymbols[i].transform.parent != null)
+                    {
+                        _reelFrames[i] = _reelSymbols[i].transform.parent.GetComponent<Image>();
+                    }
+                }
+            }
+
+            // 자동 스핀 버튼 설정
+            if (_autoSpinButtonRef != null)
+            {
+                _autoSpinButton = _autoSpinButtonRef;
+            }
+            if (_autoSpinTextRef != null)
+            {
+                _autoSpinText = _autoSpinTextRef;
+            }
+
+            // 스핀 버튼 텍스트 찾기
+            if (_spinButton != null && _spinButtonText == null)
+            {
+                _spinButtonText = _spinButton.GetComponentInChildren<TextMeshProUGUI>();
+            }
+
+            // 클릭 이벤트 바인딩
+            if (_clickArea != null)
+            {
+                _clickArea.onClick.RemoveAllListeners();
+                _clickArea.onClick.AddListener(OnClickAreaClicked);
+            }
+
+            // 베팅 버튼 이벤트 바인딩
+            if (_betButtons != null)
+            {
+                float[] betValues = { 0.1f, 0.3f, 0.5f, 1f };
+                for (int i = 0; i < _betButtons.Length && i < betValues.Length; i++)
+                {
+                    if (_betButtons[i] != null)
+                    {
+                        float betValue = betValues[i];
+                        _betButtons[i].onClick.RemoveAllListeners();
+                        _betButtons[i].onClick.AddListener(() => SetBetPercentage(betValue));
+                    }
+                }
+            }
+
+            // 스핀 버튼 이벤트
+            if (_spinButton != null)
+            {
+                _spinButton.onClick.RemoveAllListeners();
+                _spinButton.onClick.AddListener(OnSpinClicked);
+            }
+
+            // 자동 스핀 버튼 이벤트
+            if (_autoSpinButton != null)
+            {
+                _autoSpinButton.onClick.RemoveAllListeners();
+                _autoSpinButton.onClick.AddListener(OnAutoSpinClicked);
+            }
+
+            // 플로팅 텍스트 프리팹 생성
+            CreateFloatingTextPrefab();
+
+            // 업그레이드 UI 생성
+            CreateUpgradeUI();
+
+            // 프레스티지 UI 생성
+            CreatePrestigeUI();
+
+            // 업그레이드 버튼 이벤트
+            if (_upgradeButton != null)
+            {
+                _upgradeButton.onClick.RemoveAllListeners();
+                _upgradeButton.onClick.AddListener(OnUpgradeButtonClicked);
+            }
+
+            // 프레스티지 버튼 이벤트
+            if (_prestigeButton != null)
+            {
+                _prestigeButton.onClick.RemoveAllListeners();
+                _prestigeButton.onClick.AddListener(OnPrestigeButtonClicked);
+            }
+
+            Debug.Log("[SlotClickerUI] Existing UI setup complete!");
         }
 
         private void CreateUI()
@@ -665,8 +804,11 @@ namespace SlotClicker.UI
 
         private void BindEvents()
         {
-            // 클릭 이벤트
-            _clickArea.onClick.AddListener(OnClickAreaClicked);
+            // 클릭 이벤트 (autoCreateUI 모드에서만 - SetupExistingUI에서는 이미 바인딩됨)
+            if (_autoCreateUI && _clickArea != null)
+            {
+                _clickArea.onClick.AddListener(OnClickAreaClicked);
+            }
 
             // 게임 매니저 이벤트
             _game.Gold.OnGoldChanged += OnGoldChanged;
