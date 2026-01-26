@@ -9,6 +9,31 @@ using TMPro;
 /// </summary>
 public class SlotClickerUIGenerator : EditorWindow
 {
+    [MenuItem("Tools/SlotClicker/Auto-Connect UI References")]
+    public static void AutoConnectExistingCanvas()
+    {
+        var existingCanvas = GameObject.Find("SlotClickerCanvas");
+        if (existingCanvas == null)
+        {
+            EditorUtility.DisplayDialog("오류", "SlotClickerCanvas를 찾을 수 없습니다.\n먼저 'Generate UI Canvas'를 실행하세요.", "확인");
+            return;
+        }
+
+        var slotClickerUI = existingCanvas.GetComponent<SlotClicker.UI.SlotClickerUI>();
+        if (slotClickerUI == null)
+        {
+            slotClickerUI = existingCanvas.AddComponent<SlotClicker.UI.SlotClickerUI>();
+        }
+
+        Undo.RecordObject(slotClickerUI, "Auto-Connect UI References");
+        AutoConnectReferences(existingCanvas, slotClickerUI);
+        EditorUtility.SetDirty(slotClickerUI);
+
+        Selection.activeGameObject = existingCanvas;
+        Debug.Log("[SlotClickerUIGenerator] UI 참조 자동 연결 완료!");
+        EditorUtility.DisplayDialog("완료", "모든 UI 참조가 자동 연결되었습니다.\n\n씬을 저장하세요 (Ctrl+S).", "확인");
+    }
+
     [MenuItem("Tools/SlotClicker/Generate UI Canvas")]
     public static void GenerateUICanvas()
     {
@@ -78,16 +103,151 @@ public class SlotClickerUIGenerator : EditorWindow
         // SlotClickerUI 컴포넌트 추가
         var slotClickerUI = canvasObj.AddComponent<SlotClicker.UI.SlotClickerUI>();
 
+        // 자동으로 참조 연결
+        AutoConnectReferences(canvasObj, slotClickerUI);
+
         // Selection
         Selection.activeGameObject = canvasObj;
 
-        Debug.Log("[SlotClickerUIGenerator] Canvas 생성 완료! Inspector에서 SlotClickerUI 컴포넌트의 참조를 연결하세요.");
+        Debug.Log("[SlotClickerUIGenerator] Canvas 생성 및 참조 자동 연결 완료!");
         EditorUtility.DisplayDialog("완료",
-            "Canvas가 생성되었습니다.\n\n" +
-            "1. SlotClickerUI 컴포넌트의 'Auto Create UI'를 비활성화하세요.\n" +
-            "2. Inspector에서 각 UI 참조를 연결하세요.\n" +
-            "3. 씬을 저장하세요.",
+            "Canvas가 생성되고 모든 참조가 자동 연결되었습니다.\n\n" +
+            "씬을 저장하세요 (Ctrl+S).",
             "확인");
+    }
+
+    static void AutoConnectReferences(GameObject canvasObj, SlotClicker.UI.SlotClickerUI slotClickerUI)
+    {
+        var so = new SerializedObject(slotClickerUI);
+
+        // Auto Create UI 비활성화
+        so.FindProperty("_autoCreateUI").boolValue = false;
+
+        // Canvas
+        so.FindProperty("_mainCanvas").objectReferenceValue = canvasObj.GetComponent<Canvas>();
+
+        // HUD
+        var topHUD = canvasObj.transform.Find("TopHUD");
+        if (topHUD != null)
+        {
+            so.FindProperty("_goldText").objectReferenceValue = topHUD.Find("GoldText")?.GetComponent<TextMeshProUGUI>();
+            so.FindProperty("_chipsText").objectReferenceValue = topHUD.Find("ChipsText")?.GetComponent<TextMeshProUGUI>();
+            so.FindProperty("_statsText").objectReferenceValue = topHUD.Find("StatsText")?.GetComponent<TextMeshProUGUI>();
+            so.FindProperty("_winRateText").objectReferenceValue = topHUD.Find("WinRateText")?.GetComponent<TextMeshProUGUI>();
+            so.FindProperty("_prestigeProgressText").objectReferenceValue = topHUD.Find("PrestigeProgressText")?.GetComponent<TextMeshProUGUI>();
+        }
+
+        // Click Area
+        var clickArea = canvasObj.transform.Find("ClickArea");
+        if (clickArea != null)
+        {
+            so.FindProperty("_clickArea").objectReferenceValue = clickArea.GetComponent<Button>();
+        }
+
+        // Slot Panel
+        var slotPanel = canvasObj.transform.Find("SlotPanel");
+        if (slotPanel != null)
+        {
+            so.FindProperty("_slotPanel").objectReferenceValue = slotPanel.GetComponent<RectTransform>();
+            so.FindProperty("_spinStateText").objectReferenceValue = slotPanel.Find("SpinStateText")?.GetComponent<TextMeshProUGUI>();
+
+            // Reel Symbols (Image[])
+            var reelSymbolsProp = so.FindProperty("_reelSymbols");
+            reelSymbolsProp.arraySize = 3;
+            for (int i = 0; i < 3; i++)
+            {
+                var reelBg = slotPanel.Find($"ReelBg_{i}");
+                if (reelBg != null)
+                {
+                    var symbol = reelBg.Find($"Symbol_{i}");
+                    if (symbol != null)
+                    {
+                        reelSymbolsProp.GetArrayElementAtIndex(i).objectReferenceValue = symbol.GetComponent<Image>();
+                    }
+                }
+            }
+
+            // Reel Frames (Image[])
+            var reelFramesProp = so.FindProperty("_reelFramesRef");
+            reelFramesProp.arraySize = 3;
+            for (int i = 0; i < 3; i++)
+            {
+                var reelBg = slotPanel.Find($"ReelBg_{i}");
+                if (reelBg != null)
+                {
+                    reelFramesProp.GetArrayElementAtIndex(i).objectReferenceValue = reelBg.GetComponent<Image>();
+                }
+            }
+
+            // Result Panel (inside SlotPanel)
+            var resultPanel = slotPanel.Find("ResultPanel");
+            if (resultPanel != null)
+            {
+                so.FindProperty("_resultPanel").objectReferenceValue = resultPanel.gameObject;
+                so.FindProperty("_resultGroup").objectReferenceValue = resultPanel.GetComponent<CanvasGroup>();
+                so.FindProperty("_resultText").objectReferenceValue = resultPanel.Find("ResultText")?.GetComponent<TextMeshProUGUI>();
+            }
+        }
+
+        // Betting Panel
+        var betPanel = canvasObj.transform.Find("BetPanel");
+        if (betPanel != null)
+        {
+            so.FindProperty("_betAmountText").objectReferenceValue = betPanel.Find("BetAmountText")?.GetComponent<TextMeshProUGUI>();
+
+            // Bet Buttons (Button[])
+            var betButtonsProp = so.FindProperty("_betButtons");
+            betButtonsProp.arraySize = 4;
+            for (int i = 0; i < 4; i++)
+            {
+                var btn = betPanel.Find($"BetBtn_{i}");
+                if (btn != null)
+                {
+                    betButtonsProp.GetArrayElementAtIndex(i).objectReferenceValue = btn.GetComponent<Button>();
+                }
+            }
+
+            // Spin Button
+            var spinBtn = betPanel.Find("SpinButton");
+            if (spinBtn != null)
+            {
+                so.FindProperty("_spinButton").objectReferenceValue = spinBtn.GetComponent<Button>();
+                so.FindProperty("_spinButtonText").objectReferenceValue = spinBtn.Find("Label")?.GetComponent<TextMeshProUGUI>();
+            }
+
+            // Auto Spin Button
+            var autoSpinBtn = betPanel.Find("AutoSpinButton");
+            if (autoSpinBtn != null)
+            {
+                so.FindProperty("_autoSpinButtonRef").objectReferenceValue = autoSpinBtn.GetComponent<Button>();
+                so.FindProperty("_autoSpinTextRef").objectReferenceValue = autoSpinBtn.Find("Label")?.GetComponent<TextMeshProUGUI>();
+            }
+        }
+
+        // Toast Panel
+        var toastPanel = canvasObj.transform.Find("ToastPanel");
+        if (toastPanel != null)
+        {
+            so.FindProperty("_toastGroup").objectReferenceValue = toastPanel.GetComponent<CanvasGroup>();
+            so.FindProperty("_toastText").objectReferenceValue = toastPanel.Find("ToastText")?.GetComponent<TextMeshProUGUI>();
+        }
+
+        // Upgrade & Prestige Buttons
+        var upgradeBtn = canvasObj.transform.Find("UpgradeButton");
+        if (upgradeBtn != null)
+        {
+            so.FindProperty("_upgradeButton").objectReferenceValue = upgradeBtn.GetComponent<Button>();
+        }
+
+        var prestigeBtn = canvasObj.transform.Find("PrestigeButton");
+        if (prestigeBtn != null)
+        {
+            so.FindProperty("_prestigeButton").objectReferenceValue = prestigeBtn.GetComponent<Button>();
+        }
+
+        so.ApplyModifiedProperties();
+
+        Debug.Log("[SlotClickerUIGenerator] 모든 UI 참조가 자동 연결되었습니다.");
     }
 
     static GameObject CreatePanel(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax,
