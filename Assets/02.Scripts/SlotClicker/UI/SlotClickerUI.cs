@@ -47,6 +47,10 @@ namespace SlotClicker.UI
         // 클릭 이펙트 풀
         private GameObject _floatingTextPrefab;
 
+        // 슬롯 스핀 관련
+        private Coroutine[] _spinCoroutines = new Coroutine[3];
+        private bool[] _isReelSpinning = new bool[3];
+
         private void Start()
         {
             StartCoroutine(WaitForGameManager());
@@ -81,6 +85,9 @@ namespace SlotClicker.UI
                 eventSystemObj.AddComponent<InputSystemUIInputModule>(); // Input System 패키지용
                 Debug.Log("[SlotClickerUI] EventSystem created (Input System)");
             }
+
+            // 스프라이트 로드
+            LoadSymbolSprites();
 
             // 캔버스 생성
             if (_mainCanvas == null)
@@ -171,6 +178,9 @@ namespace SlotClicker.UI
                     new Vector2(startX + (i * spacing), 0), new Vector2(120, 120),
                     new Color(0.05f, 0.05f, 0.1f, 1f));
 
+                // 릴 배경에 마스크 추가 (심볼이 영역 밖으로 나가지 않도록)
+                reelBg.AddComponent<Mask>().showMaskGraphic = true;
+
                 GameObject symbolObj = new GameObject($"Symbol_{i}");
                 symbolObj.transform.SetParent(reelBg.transform, false);
                 RectTransform symRect = symbolObj.AddComponent<RectTransform>();
@@ -180,7 +190,19 @@ namespace SlotClicker.UI
                 symRect.offsetMax = new Vector2(-8, -8);
 
                 _reelSymbols[i] = symbolObj.AddComponent<Image>();
-                _reelSymbols[i].color = GetSymbolColor(i);
+                _reelSymbols[i].preserveAspect = true;
+
+                // 초기 스프라이트 설정
+                Sprite sprite = GetSymbolSprite(i);
+                if (sprite != null)
+                {
+                    _reelSymbols[i].sprite = sprite;
+                    _reelSymbols[i].color = Color.white;
+                }
+                else
+                {
+                    _reelSymbols[i].color = GetSymbolColor(i);
+                }
             }
         }
 
@@ -369,6 +391,32 @@ namespace SlotClicker.UI
             return colors[index % colors.Length];
         }
 
+        private void LoadSymbolSprites()
+        {
+            // Resources 폴더에서 스프라이트 시트 로드
+            _symbolSprites = Resources.LoadAll<Sprite>("Sprites/SymbolSprites");
+
+            if (_symbolSprites == null || _symbolSprites.Length == 0)
+            {
+                Debug.LogWarning("[SlotClickerUI] Failed to load symbol sprites from Resources/Sprites/SymbolSprites");
+                // 기본 스프라이트 생성 (fallback)
+                _symbolSprites = new Sprite[7];
+            }
+            else
+            {
+                Debug.Log($"[SlotClickerUI] Loaded {_symbolSprites.Length} symbol sprites");
+            }
+        }
+
+        private Sprite GetSymbolSprite(int index)
+        {
+            if (_symbolSprites != null && _symbolSprites.Length > 0)
+            {
+                return _symbolSprites[index % _symbolSprites.Length];
+            }
+            return null;
+        }
+
         private void CreateUpgradeButton(RectTransform parent)
         {
             // 업그레이드 버튼 (화면 오른쪽 상단, HUD 바로 아래)
@@ -541,11 +589,58 @@ namespace SlotClicker.UI
             _spinButton.interactable = false;
             _resultText.gameObject.SetActive(false);
 
-            // 릴 스핀 애니메이션
+            // 각 릴 스핀 애니메이션 시작
             for (int i = 0; i < _reelSymbols.Length; i++)
             {
-                _reelSymbols[i].transform.DORotate(new Vector3(0, 0, 360 * 5), 2f, RotateMode.FastBeyond360)
-                    .SetEase(Ease.InOutQuad);
+                _isReelSpinning[i] = true;
+                if (_spinCoroutines[i] != null)
+                    StopCoroutine(_spinCoroutines[i]);
+                _spinCoroutines[i] = StartCoroutine(SpinReelAnimation(i));
+            }
+        }
+
+        /// <summary>
+        /// 릴 스핀 애니메이션 코루틴 - 심볼이 빠르게 변경됨
+        /// </summary>
+        private System.Collections.IEnumerator SpinReelAnimation(int reelIndex)
+        {
+            float spinSpeed = 0.05f; // 심볼 변경 속도
+            int symbolCount = _symbolSprites != null && _symbolSprites.Length > 0
+                ? _symbolSprites.Length
+                : _game.Config.symbolCount;
+
+            while (_isReelSpinning[reelIndex])
+            {
+                // 랜덤 심볼로 변경
+                int randomSymbol = UnityEngine.Random.Range(0, symbolCount);
+                SetReelSymbol(reelIndex, randomSymbol);
+
+                // 심볼 변경 시 살짝 흔들림 효과
+                _reelSymbols[reelIndex].transform.DOKill();
+                _reelSymbols[reelIndex].transform.localScale = Vector3.one;
+                _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.1f, spinSpeed * 0.8f, 0, 0);
+
+                yield return new WaitForSeconds(spinSpeed);
+            }
+        }
+
+        /// <summary>
+        /// 릴에 심볼 설정
+        /// </summary>
+        private void SetReelSymbol(int reelIndex, int symbolIndex)
+        {
+            if (reelIndex < 0 || reelIndex >= _reelSymbols.Length) return;
+
+            Sprite sprite = GetSymbolSprite(symbolIndex);
+            if (sprite != null)
+            {
+                _reelSymbols[reelIndex].sprite = sprite;
+                _reelSymbols[reelIndex].color = Color.white;
+            }
+            else
+            {
+                _reelSymbols[reelIndex].sprite = null;
+                _reelSymbols[reelIndex].color = GetSymbolColor(symbolIndex);
             }
         }
 
@@ -553,10 +648,27 @@ namespace SlotClicker.UI
         {
             if (reelIndex < _reelSymbols.Length)
             {
-                _reelSymbols[reelIndex].DOKill();
+                // 스핀 애니메이션 중지
+                _isReelSpinning[reelIndex] = false;
+                if (_spinCoroutines[reelIndex] != null)
+                {
+                    StopCoroutine(_spinCoroutines[reelIndex]);
+                    _spinCoroutines[reelIndex] = null;
+                }
+
+                // 최종 심볼 설정
+                _reelSymbols[reelIndex].transform.DOKill();
+                _reelSymbols[reelIndex].transform.localScale = Vector3.one;
                 _reelSymbols[reelIndex].transform.rotation = Quaternion.identity;
-                _reelSymbols[reelIndex].color = GetSymbolColor(symbolIndex);
-                _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.2f, 0.3f);
+
+                SetReelSymbol(reelIndex, symbolIndex);
+
+                // 정지 효과 (바운스)
+                _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.25f, 0.4f, 5, 0.5f);
+
+                // 정지 사운드 효과를 위한 플래시
+                _reelSymbols[reelIndex].DOColor(Color.white * 1.5f, 0.1f)
+                    .OnComplete(() => _reelSymbols[reelIndex].DOColor(Color.white, 0.2f));
             }
         }
 

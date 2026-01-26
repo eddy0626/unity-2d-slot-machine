@@ -1,0 +1,546 @@
+fileFormatVersion: 2
+guid: 582761aab55753f4399f5de74610702b
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -200341179805359897
+    second: SymbolSprites_0
+  - first:
+      213: -2294977272396180931
+    second: SymbolSprites_1
+  - first:
+      213: 6908658254807216367
+    second: SymbolSprites_2
+  - first:
+      213: -2046940892299310231
+    second: SymbolSprites_3
+  - first:
+      213: -6763663619593168816
+    second: SymbolSprites_4
+  - first:
+      213: 7156936000766822197
+    second: SymbolSprites_5
+  - first:
+      213: 6129059744671804775
+    second: SymbolSprites_6
+  - first:
+      213: -3076708095982892302
+    second: SymbolSprites_7
+  - first:
+      213: -1838550731643200980
+    second: SymbolSprites_8
+  - first:
+      213: 6071302497593202125
+    second: SymbolSprites_9
+  - first:
+      213: -7523710155544464565
+    second: SymbolSprites_10
+  - first:
+      213: 1755184633590427898
+    second: SymbolSprites_11
+  - first:
+      213: -7328171974300121085
+    second: SymbolSprites_12
+  - first:
+      213: 1966480397274643657
+    second: SymbolSprites_13
+  - first:
+      213: 6182684346058334392
+    second: SymbolSprites_14
+  - first:
+      213: -7364009509837999384
+    second: SymbolSprites_15
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: SymbolSprites_0
+      rect:
+        serializedVersion: 2
+        x: 77
+        y: 1524
+        width: 409
+        height: 444
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7e0a1d722ce383df0800000000000000
+      internalID: -200341179805359897
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_1
+      rect:
+        serializedVersion: 2
+        x: 597
+        y: 1524
+        width: 377
+        height: 439
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d321b3f745a9620e0800000000000000
+      internalID: -2294977272396180931
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_2
+      rect:
+        serializedVersion: 2
+        x: 1066
+        y: 1524
+        width: 427
+        height: 442
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fe0ba50441c70ef50800000000000000
+      internalID: 6908658254807216367
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_3
+      rect:
+        serializedVersion: 2
+        x: 1549
+        y: 1524
+        width: 417
+        height: 441
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 96b47468a1ec793e0800000000000000
+      internalID: -2046940892299310231
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_4
+      rect:
+        serializedVersion: 2
+        x: 67
+        y: 1052
+        width: 411
+        height: 417
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0589aedf5c3a222a0800000000000000
+      internalID: -6763663619593168816
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_5
+      rect:
+        serializedVersion: 2
+        x: 573
+        y: 1052
+        width: 430
+        height: 407
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 53749e5af5b825360800000000000000
+      internalID: 7156936000766822197
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_6
+      rect:
+        serializedVersion: 2
+        x: 1078
+        y: 1067
+        width: 382
+        height: 388
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 76d2f485d5bce0550800000000000000
+      internalID: 6129059744671804775
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_7
+      rect:
+        serializedVersion: 2
+        x: 1553
+        y: 1081
+        width: 402
+        height: 341
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2fa0f5da9465d45d0800000000000000
+      internalID: -3076708095982892302
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_8
+      rect:
+        serializedVersion: 2
+        x: 109
+        y: 582
+        width: 386
+        height: 392
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c2a5fd2c9d72c76e0800000000000000
+      internalID: -1838550731643200980
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_9
+      rect:
+        serializedVersion: 2
+        x: 603
+        y: 571
+        width: 361
+        height: 400
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dc51cf45479914450800000000000000
+      internalID: 6071302497593202125
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_10
+      rect:
+        serializedVersion: 2
+        x: 1074
+        y: 570
+        width: 388
+        height: 400
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b43f5c1d979669790800000000000000
+      internalID: -7523710155544464565
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_11
+      rect:
+        serializedVersion: 2
+        x: 1557
+        y: 584
+        width: 389
+        height: 392
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: af0b168ff1bab5810800000000000000
+      internalID: 1755184633590427898
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_12
+      rect:
+        serializedVersion: 2
+        x: 106
+        y: 65
+        width: 406
+        height: 440
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3084eda6a6a1d4a90800000000000000
+      internalID: -7328171974300121085
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_13
+      rect:
+        serializedVersion: 2
+        x: 555
+        y: 66
+        width: 452
+        height: 453
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9ccf251a0875a4b10800000000000000
+      internalID: 1966480397274643657
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_14
+      rect:
+        serializedVersion: 2
+        x: 1075
+        y: 83
+        width: 387
+        height: 413
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8b0ec2dc7ae4dc550800000000000000
+      internalID: 6182684346058334392
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SymbolSprites_15
+      rect:
+        serializedVersion: 2
+        x: 1561
+        y: 92
+        width: 382
+        height: 390
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8e2f183fd58cdc990800000000000000
+      internalID: -7364009509837999384
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      SymbolSprites_0: -200341179805359897
+      SymbolSprites_1: -2294977272396180931
+      SymbolSprites_10: -7523710155544464565
+      SymbolSprites_11: 1755184633590427898
+      SymbolSprites_12: -7328171974300121085
+      SymbolSprites_13: 1966480397274643657
+      SymbolSprites_14: 6182684346058334392
+      SymbolSprites_15: -7364009509837999384
+      SymbolSprites_2: 6908658254807216367
+      SymbolSprites_3: -2046940892299310231
+      SymbolSprites_4: -6763663619593168816
+      SymbolSprites_5: 7156936000766822197
+      SymbolSprites_6: 6129059744671804775
+      SymbolSprites_7: -3076708095982892302
+      SymbolSprites_8: -1838550731643200980
+      SymbolSprites_9: 6071302497593202125
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
