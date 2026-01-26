@@ -32,9 +32,6 @@ namespace SlotClicker.Core
         private PlayerData _playerData;
         private GameConfig _config;
 
-        // 업그레이드 효과
-        private int _successRateLevel = 0;
-
         // 상태
         private bool _isSpinning = false;
         public bool IsSpinning => _isSpinning;
@@ -49,8 +46,6 @@ namespace SlotClicker.Core
             _gameManager = gameManager;
             _playerData = gameManager.PlayerData;
             _config = gameManager.Config;
-
-            _successRateLevel = _playerData.GetUpgradeLevel("slot_success_rate");
 
             Debug.Log("[SlotManager] Initialized");
         }
@@ -142,9 +137,12 @@ namespace SlotClicker.Core
             SlotOutcome outcome = DetermineOutcome();
             result.Outcome = outcome;
 
-            // 배당률 적용
+            // 배당률 적용 (보상 배율 업그레이드 포함)
             result.RewardMultiplier = GetMultiplier(outcome);
-            result.FinalReward = betAmount * result.RewardMultiplier;
+
+            // 골드 부스트 적용
+            float goldBoost = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.GoldBoost);
+            result.FinalReward = betAmount * result.RewardMultiplier * goldBoost;
 
             // 심볼 생성 (결과에 맞게)
             GenerateSymbols(result);
@@ -157,12 +155,15 @@ namespace SlotClicker.Core
         /// </summary>
         private SlotOutcome DetermineOutcome()
         {
-            // 성공률 업그레이드 적용 (레벨당 +2%)
-            float successBonus = 1f + (_successRateLevel * 0.02f);
+            // 성공률 업그레이드 적용 (UpgradeManager에서)
+            float successBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.SlotSuccessRate);
+
+            // 잭팟 확률 업그레이드
+            float jackpotBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.JackpotRate);
 
             // 조정된 확률
-            float adjustedJackpot = _config.jackpotRate * successBonus;
-            float adjustedMegaJackpot = _config.megaJackpotRate * successBonus;
+            float adjustedMegaJackpot = _config.megaJackpotRate * jackpotBonus;
+            float adjustedJackpot = _config.jackpotRate * jackpotBonus;
             float adjustedBigWin = _config.bigWinRate * successBonus;
             float adjustedSmallWin = _config.smallWinRate * successBonus;
             float adjustedMiniWin = _config.miniWinRate * successBonus;
@@ -194,11 +195,11 @@ namespace SlotClicker.Core
         }
 
         /// <summary>
-        /// 결과별 배당률
+        /// 결과별 배당률 (보상 배율 업그레이드 적용)
         /// </summary>
         private float GetMultiplier(SlotOutcome outcome)
         {
-            return outcome switch
+            float baseMultiplier = outcome switch
             {
                 SlotOutcome.MegaJackpot => _config.megaJackpotMultiplier,
                 SlotOutcome.Jackpot => _config.jackpotMultiplier,
@@ -208,6 +209,15 @@ namespace SlotClicker.Core
                 SlotOutcome.Draw => _config.drawMultiplier,
                 _ => 0f
             };
+
+            // 보상 배율 업그레이드 적용 (승리 시에만)
+            if (outcome != SlotOutcome.Loss && outcome != SlotOutcome.Draw)
+            {
+                float rewardBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.RewardMultiplier);
+                baseMultiplier *= rewardBonus;
+            }
+
+            return baseMultiplier;
         }
 
         /// <summary>
@@ -270,11 +280,11 @@ namespace SlotClicker.Core
         }
 
         /// <summary>
-        /// 업그레이드 레벨 갱신
+        /// 업그레이드 레벨 갱신 (호환성 유지)
         /// </summary>
         public void RefreshUpgrades()
         {
-            _successRateLevel = _playerData.GetUpgradeLevel("slot_success_rate");
+            // UpgradeManager가 캐시를 관리하므로 별도 작업 불필요
         }
 
         /// <summary>
@@ -282,8 +292,17 @@ namespace SlotClicker.Core
         /// </summary>
         public float GetCurrentJackpotRate()
         {
-            float successBonus = 1f + (_successRateLevel * 0.02f);
-            return _config.jackpotRate * successBonus;
+            float jackpotBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.JackpotRate);
+            return _config.jackpotRate * jackpotBonus;
+        }
+
+        /// <summary>
+        /// 현재 메가잭팟 확률
+        /// </summary>
+        public float GetCurrentMegaJackpotRate()
+        {
+            float jackpotBonus = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.JackpotRate);
+            return _config.megaJackpotRate * jackpotBonus;
         }
     }
 }

@@ -18,6 +18,7 @@ namespace SlotClicker.Core
         public GoldManager Gold { get; private set; }
         public ClickManager Click { get; private set; }
         public SlotManager Slot { get; private set; }
+        public UpgradeManager Upgrade { get; private set; }
 
         // 플레이어 데이터
         public PlayerData PlayerData { get; private set; }
@@ -70,15 +71,19 @@ namespace SlotClicker.Core
 
         private void InitializeManagers()
         {
-            // GoldManager 초기화
+            // GoldManager 초기화 (먼저 - 다른 매니저들이 골드 체크에 필요)
             Gold = gameObject.AddComponent<GoldManager>();
             Gold.Initialize(this);
 
-            // ClickManager 초기화
+            // UpgradeManager 초기화 (ClickManager, SlotManager보다 먼저!)
+            Upgrade = gameObject.AddComponent<UpgradeManager>();
+            Upgrade.Initialize(this);
+
+            // ClickManager 초기화 (UpgradeManager 효과 사용)
             Click = gameObject.AddComponent<ClickManager>();
             Click.Initialize(this);
 
-            // SlotManager 초기화
+            // SlotManager 초기화 (UpgradeManager 효과 사용)
             Slot = gameObject.AddComponent<SlotManager>();
             Slot.Initialize(this);
         }

@@ -32,6 +32,10 @@ namespace SlotClicker.UI
         [SerializeField] private Color _criticalColor = new Color(1f, 0.8f, 0f);
         [SerializeField] private Color _jackpotColor = new Color(1f, 0.2f, 0.2f);
 
+        [Header("=== 업그레이드 UI ===")]
+        [SerializeField] private Button _upgradeButton;
+        private UpgradeUI _upgradeUI;
+
         // 내부 상태
         private GameManager _game;
         private float _currentBetPercentage = 0.1f;
@@ -98,6 +102,12 @@ namespace SlotClicker.UI
 
             // === 플로팅 텍스트 프리팹 ===
             CreateFloatingTextPrefab();
+
+            // === 업그레이드 버튼 ===
+            CreateUpgradeButton(canvasRect);
+
+            // === 업그레이드 UI ===
+            CreateUpgradeUI();
 
             Debug.Log("[SlotClickerUI] UI created successfully!");
         }
@@ -340,6 +350,47 @@ namespace SlotClicker.UI
                 new Color(1f, 0.8f, 0f)     // 금
             };
             return colors[index % colors.Length];
+        }
+
+        private void CreateUpgradeButton(RectTransform parent)
+        {
+            // 업그레이드 버튼 (화면 왼쪽 상단)
+            GameObject btnObj = CreateButton(parent, "UpgradeButton", "UPGRADES",
+                new Vector2(0, 1), new Vector2(0, 1),
+                new Vector2(100, -180), new Vector2(160, 50),
+                new Color(0.4f, 0.3f, 0.7f));
+
+            _upgradeButton = btnObj.GetComponent<Button>();
+            _upgradeButton.onClick.AddListener(OnUpgradeButtonClicked);
+
+            // 아이콘 효과 (펄스)
+            btnObj.transform.DOScale(1.05f, 0.5f)
+                .SetLoops(-1, LoopType.Yoyo)
+                .SetEase(Ease.InOutSine);
+        }
+
+        private void CreateUpgradeUI()
+        {
+            GameObject upgradeUIObj = new GameObject("UpgradeUI");
+            upgradeUIObj.transform.SetParent(_mainCanvas.transform, false);
+
+            RectTransform rect = upgradeUIObj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.1f, 0.1f);
+            rect.anchorMax = new Vector2(0.9f, 0.9f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            _upgradeUI = upgradeUIObj.AddComponent<UpgradeUI>();
+            _upgradeUI.Initialize(_game);
+            _upgradeUI.Hide();
+        }
+
+        private void OnUpgradeButtonClicked()
+        {
+            if (_upgradeUI != null)
+            {
+                _upgradeUI.Toggle();
+            }
         }
 
         #endregion

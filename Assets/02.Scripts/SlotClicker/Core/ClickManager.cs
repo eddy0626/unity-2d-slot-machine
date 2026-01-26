@@ -10,11 +10,6 @@ namespace SlotClicker.Core
         private PlayerData _playerData;
         private GameConfig _config;
 
-        // 업그레이드 효과
-        private int _clickPowerLevel = 0;
-        private int _criticalChanceLevel = 0;
-        private int _criticalMultiplierLevel = 0;
-
         // 이벤트
         public event Action<ClickResult> OnClick;
 
@@ -24,17 +19,7 @@ namespace SlotClicker.Core
             _playerData = gameManager.PlayerData;
             _config = gameManager.Config;
 
-            // 업그레이드 레벨 로드
-            LoadUpgradeLevels();
-
             Debug.Log("[ClickManager] Initialized");
-        }
-
-        private void LoadUpgradeLevels()
-        {
-            _clickPowerLevel = _playerData.GetUpgradeLevel("click_power");
-            _criticalChanceLevel = _playerData.GetUpgradeLevel("critical_chance");
-            _criticalMultiplierLevel = _playerData.GetUpgradeLevel("critical_multiplier");
         }
 
         /// <summary>
@@ -47,14 +32,17 @@ namespace SlotClicker.Core
             // 기본 클릭 파워 계산
             double basePower = _config.baseClickPower;
 
-            // 클릭 파워 업그레이드 적용 (레벨당 +50%)
-            double upgradeMultiplier = 1 + (_clickPowerLevel * 0.5);
+            // 클릭 파워 업그레이드 적용 (UpgradeManager에서 가져옴)
+            double upgradeMultiplier = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.ClickPower);
 
             // 프레스티지 보너스 적용
             double prestigeBonus = _gameManager.GetPrestigeBonus();
 
+            // 골드 부스트 적용
+            double goldBoost = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.GoldBoost);
+
             // 최종 기본 골드
-            double baseGold = basePower * upgradeMultiplier * prestigeBonus;
+            double baseGold = basePower * upgradeMultiplier * prestigeBonus * goldBoost;
 
             // 크리티컬 판정
             bool isCritical = CheckCritical();
@@ -87,8 +75,7 @@ namespace SlotClicker.Core
         /// </summary>
         private bool CheckCritical()
         {
-            float critChance = _config.criticalChance + (_criticalChanceLevel * 0.01f);
-            critChance = Mathf.Min(critChance, 0.5f); // 최대 50%
+            float critChance = GetCurrentCriticalChance();
             return UnityEngine.Random.value < critChance;
         }
 
@@ -97,7 +84,10 @@ namespace SlotClicker.Core
         /// </summary>
         private float GetCriticalMultiplier()
         {
-            return _config.criticalMultiplier + (_criticalMultiplierLevel * 0.5f);
+            // 기본 배율 + 업그레이드 효과
+            float baseMultiplier = _config.criticalMultiplier;
+            float upgradeBonus = _gameManager.Upgrade.GetEffectValue(UpgradeEffect.CriticalMultiplier);
+            return baseMultiplier + upgradeBonus;
         }
 
         /// <summary>
@@ -106,9 +96,10 @@ namespace SlotClicker.Core
         public double GetExpectedGoldPerClick()
         {
             double basePower = _config.baseClickPower;
-            double upgradeMultiplier = 1 + (_clickPowerLevel * 0.5);
+            double upgradeMultiplier = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.ClickPower);
             double prestigeBonus = _gameManager.GetPrestigeBonus();
-            return basePower * upgradeMultiplier * prestigeBonus;
+            double goldBoost = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.GoldBoost);
+            return basePower * upgradeMultiplier * prestigeBonus * goldBoost;
         }
 
         /// <summary>
@@ -116,15 +107,18 @@ namespace SlotClicker.Core
         /// </summary>
         public float GetCurrentCriticalChance()
         {
-            return Mathf.Min(_config.criticalChance + (_criticalChanceLevel * 0.01f), 0.5f);
+            // 기본 확률 + 업그레이드 효과 (%)
+            float baseChance = _config.criticalChance;
+            float upgradeBonus = _gameManager.Upgrade.GetEffectValue(UpgradeEffect.CriticalChance) / 100f;
+            return Mathf.Min(baseChance + upgradeBonus, 0.5f); // 최대 50%
         }
 
         /// <summary>
-        /// 업그레이드 레벨 갱신
+        /// 업그레이드 레벨 갱신 (호환성 유지)
         /// </summary>
         public void RefreshUpgrades()
         {
-            LoadUpgradeLevels();
+            // UpgradeManager가 캐시를 관리하므로 별도 작업 불필요
         }
     }
 
