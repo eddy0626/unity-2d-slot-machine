@@ -104,17 +104,17 @@ namespace SlotClicker.UI
 
             RectTransform canvasRect = _mainCanvas.GetComponent<RectTransform>();
 
-            // === 상단 HUD ===
-            CreateTopHUD(canvasRect);
-
-            // === 슬롯머신 영역 ===
-            CreateSlotArea(canvasRect);
-
-            // === 클릭 영역 ===
+            // === 클릭 영역 (먼저 생성 - 뒤에 렌더링) ===
             CreateClickArea(canvasRect);
 
             // === 하단 베팅 UI ===
             CreateBettingUI(canvasRect);
+
+            // === 상단 HUD ===
+            CreateTopHUD(canvasRect);
+
+            // === 슬롯머신 영역 (나중에 생성 - 앞에 렌더링) ===
+            CreateSlotArea(canvasRect);
 
             // === 결과 텍스트 ===
             CreateResultText(canvasRect);
@@ -211,9 +211,9 @@ namespace SlotClicker.UI
 
         private void CreateClickArea(RectTransform parent)
         {
-            // 클릭 영역 (카지노 테이블) - 화면 중앙
+            // 클릭 영역 (카지노 테이블) - 화면 중앙 아래쪽
             GameObject clickPanel = CreatePanel(parent, "ClickArea", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(0, 50), new Vector2(700, 300), new Color(0.1f, 0.4f, 0.15f, 1f));
+                new Vector2(0, -50), new Vector2(650, 280), new Color(0.1f, 0.4f, 0.15f, 1f));
             RectTransform clickRect = clickPanel.GetComponent<RectTransform>();
 
             AddOutline(clickPanel, new Color(0.6f, 0.4f, 0.1f), 5);
