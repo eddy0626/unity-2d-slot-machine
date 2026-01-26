@@ -148,7 +148,7 @@ namespace SlotClicker.Data
                     baseCost = 10,
                     costMultiplier = 1.15f,
                     maxLevel = -1,
-                    effectPerLevel = 0.5f,
+                    effectPerLevel = 25f,  // 레벨당 25% 증가 (기존 0.5%)
                     effectFormat = "+{0}%"
                 },
                 new UpgradeData
@@ -174,7 +174,7 @@ namespace SlotClicker.Data
                     baseCost = 100,
                     costMultiplier = 1.25f,
                     maxLevel = -1,
-                    effectPerLevel = 0.5f,
+                    effectPerLevel = 0.25f,  // 레벨당 +0.25x (기존 0.5f)
                     effectFormat = "+{0}x"
                 }
             };
