@@ -255,7 +255,7 @@ namespace SlotClicker.UI
             closeObj.transform.SetParent(parent);
 
             RectTransform closeRect = closeObj.AddComponent<RectTransform>();
-            closeRect.sizeDelta = new Vector2(0, 45);
+            closeRect.sizeDelta = new Vector2(0, 50);  // 터치 타겟 최소 48px 보장
 
             Image closeBg = closeObj.AddComponent<Image>();
             closeBg.color = new Color(0.6f, 0.2f, 0.2f);
@@ -265,8 +265,8 @@ namespace SlotClicker.UI
             closeBtn.onClick.AddListener(Hide);
 
             LayoutElement closeLE = closeObj.AddComponent<LayoutElement>();
-            closeLE.minHeight = 45;
-            closeLE.preferredHeight = 45;
+            closeLE.minHeight = 50;  // 터치 타겟 최소 48px 보장
+            closeLE.preferredHeight = 50;
 
             // 텍스트
             GameObject textObj = new GameObject("Text");
@@ -363,7 +363,8 @@ namespace SlotClicker.UI
             // 컴포넌트 추가
             UpgradeItemUI itemUI = itemObj.AddComponent<UpgradeItemUI>();
             itemUI.Initialize(info, buyButton, infoArea.GetComponentInChildren<Text>(),
-                () => _upgradeManager.TryPurchase(info.Data.id));
+                () => _upgradeManager.TryPurchase(info.Data.id),
+                _upgradeManager);
 
             return itemUI;
         }
@@ -517,13 +518,18 @@ namespace SlotClicker.UI
         private Button _buyButton;
         private Text _nameText;
         private Action _onPurchase;
+        private UpgradeManager _upgradeManager;
+        private string _upgradeId;
 
-        public void Initialize(UpgradeInfo info, Button buyButton, Text nameText, Action onPurchase)
+        public void Initialize(UpgradeInfo info, Button buyButton, Text nameText, Action onPurchase,
+            UpgradeManager upgradeManager = null)
         {
             _info = info;
             _buyButton = buyButton;
             _nameText = nameText;
             _onPurchase = onPurchase;
+            _upgradeManager = upgradeManager;
+            _upgradeId = info.Data.id;
 
             if (_buyButton != null)
             {
@@ -533,7 +539,31 @@ namespace SlotClicker.UI
 
         private void OnBuyClicked()
         {
+            // 구매 전 레벨 저장
+            int previousLevel = _info.CurrentLevel;
+
             _onPurchase?.Invoke();
+
+            // 구매 결과 피드백
+            if (_upgradeManager != null)
+            {
+                int newLevel = _upgradeManager.GetLevel(_upgradeId);
+                if (newLevel > previousLevel)
+                {
+                    // 구매 성공
+                    UIFeedback.PlayPurchaseSuccessFeedback(gameObject);
+                }
+                else
+                {
+                    // 구매 실패 (골드 부족 등)
+                    UIFeedback.PlayPurchaseFailFeedback(gameObject);
+                }
+            }
+            else
+            {
+                // UpgradeManager 없으면 기본 피드백
+                UIFeedback.PlayButtonFeedback(gameObject);
+            }
         }
 
         public void UpdateDisplay(UpgradeInfo newInfo)

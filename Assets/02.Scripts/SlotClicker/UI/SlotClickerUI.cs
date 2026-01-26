@@ -272,6 +272,9 @@ namespace SlotClicker.UI
                 _prestigeButton.onClick.AddListener(OnPrestigeButtonClicked);
             }
 
+            // UIFeedback 초기화
+            UIFeedback.Instance.SetCanvas(_mainCanvas);
+
             Debug.Log("[SlotClickerUI] Existing UI setup complete!");
         }
 
@@ -336,6 +339,9 @@ namespace SlotClicker.UI
 
             // === 프레스티지 UI ===
             CreatePrestigeUI();
+
+            // === UIFeedback 초기화 ===
+            UIFeedback.Instance.SetCanvas(_mainCanvas);
 
             Debug.Log("[SlotClickerUI] UI created successfully!");
         }

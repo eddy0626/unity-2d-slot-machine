@@ -77,6 +77,7 @@ namespace SlotClicker.UI
             if (_prestigeButton != null)
             {
                 _prestigeButton.onClick.AddListener(OnPrestigeButtonClicked);
+                UIFeedback.AddButtonFeedback(_prestigeButton);
             }
         }
 
@@ -85,10 +86,12 @@ namespace SlotClicker.UI
             if (_prestigeTabButton != null)
             {
                 _prestigeTabButton.onClick.AddListener(ShowPrestigeTab);
+                UIFeedback.AddButtonFeedback(_prestigeTabButton);
             }
             if (_charmShopTabButton != null)
             {
                 _charmShopTabButton.onClick.AddListener(ShowCharmShopTab);
+                UIFeedback.AddButtonFeedback(_charmShopTabButton);
             }
         }
 
@@ -225,9 +228,37 @@ namespace SlotClicker.UI
 
             int chipsToGain = _prestige.CalculateChipsToGain();
 
-            // 확인 팝업 대신 바로 실행 (간단한 구현)
-            // TODO: 확인 팝업 추가
+            // 확인 팝업 표시
+            string title = "프레스티지 확인";
+            string message = $"프레스티지를 실행하면:\n\n" +
+                           $"<color=#FF6666>- 모든 골드가 초기화됩니다</color>\n" +
+                           $"<color=#FF6666>- 모든 업그레이드가 초기화됩니다</color>\n\n" +
+                           $"<color=#66FF66>+ {chipsToGain} 칩을 획득합니다</color>\n" +
+                           $"<color=#66FF66>+ 영구 보너스가 증가합니다</color>\n\n" +
+                           $"계속하시겠습니까?";
+
+            UIFeedback.Instance.ShowConfirmPopup(
+                title,
+                message,
+                onConfirm: () => ExecutePrestigeWithFeedback(chipsToGain),
+                onCancel: null,
+                confirmText: "프레스티지!",
+                cancelText: "취소",
+                confirmColor: new Color(0.8f, 0.4f, 0.8f) // 보라색
+            );
+        }
+
+        private void ExecutePrestigeWithFeedback(int chipsToGain)
+        {
             _prestige.ExecutePrestige();
+
+            // 성공 피드백
+            UIFeedback.Instance.ShowToast(
+                $"프레스티지 완료! +{chipsToGain} 칩 획득!",
+                new Color(1f, 0.8f, 0.2f),
+                3f,
+                ToastType.Success
+            );
         }
 
         private void OnPrestigeComplete()
@@ -252,6 +283,18 @@ namespace SlotClicker.UI
             {
                 _vipRankText.transform.DOPunchScale(Vector3.one * 0.5f, 0.5f, 5);
             }
+
+            // VIP 등급 업 축하 토스트
+            string rankName = _prestige.GetVIPRankName(newRank);
+            string rankColor = GetVIPRankColor(newRank);
+            float vipBonus = _prestige.GetVIPBonus() * 100f;
+
+            UIFeedback.Instance.ShowToast(
+                $"🎉 VIP 등급 상승! {rankName} (+{vipBonus:F0}% 보너스)",
+                new Color(1f, 0.85f, 0.2f),
+                3f,
+                ToastType.Success
+            );
 
             Debug.Log($"[PrestigeUI] VIP Rank upgraded to: {newRank}");
         }
@@ -361,9 +404,36 @@ namespace SlotClicker.UI
 
         private void OnCharmBuyClicked(string charmId)
         {
+            // 구매 전 칩 수량 확인
+            int previousChips = _prestige.TotalChips;
+
             if (_prestige.TryPurchaseCharm(charmId))
             {
                 RefreshUI();
+
+                // 구매 성공 피드백
+                var charmData = _prestige.GetAllCharms().Find(c => c.id == charmId);
+                string charmName = charmData != null ? charmData.name : "럭키참";
+
+                UIFeedback.Instance.ShowToast(
+                    $"✨ {charmName} 구매 완료!",
+                    new Color(0.4f, 1f, 0.6f),
+                    2f,
+                    ToastType.Success
+                );
+            }
+            else
+            {
+                // 구매 실패 피드백
+                if (_prestige.TotalChips < _prestige.GetAllCharms().Find(c => c.id == charmId)?.chipCost)
+                {
+                    UIFeedback.Instance.ShowToast(
+                        "칩이 부족합니다!",
+                        new Color(1f, 0.4f, 0.4f),
+                        2f,
+                        ToastType.Error
+                    );
+                }
             }
         }
 
