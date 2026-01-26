@@ -14,22 +14,22 @@ namespace SlotClicker.Data
         public int reelCount = 3;
         public int symbolCount = 7;
 
-        [Header("슬롯 확률 (합계 100%)")]
-        [Range(0, 100)] public float lossRate = 50f;
-        [Range(0, 100)] public float drawRate = 20f;
-        [Range(0, 100)] public float miniWinRate = 15f;
-        [Range(0, 100)] public float smallWinRate = 10f;
-        [Range(0, 100)] public float bigWinRate = 3.5f;
-        [Range(0, 100)] public float jackpotRate = 1f;
-        [Range(0, 100)] public float megaJackpotRate = 0.5f;
+        [Header("슬롯 확률 (합계 100%) - EV 약 85%")]
+        [Range(0, 100)] public float lossRate = 60f;        // 50 → 60
+        [Range(0, 100)] public float drawRate = 15f;        // 20 → 15
+        [Range(0, 100)] public float miniWinRate = 12f;     // 15 → 12
+        [Range(0, 100)] public float smallWinRate = 8f;     // 10 → 8
+        [Range(0, 100)] public float bigWinRate = 3.5f;     // 유지
+        [Range(0, 100)] public float jackpotRate = 1.3f;    // 1 → 1.3
+        [Range(0, 100)] public float megaJackpotRate = 0.2f; // 0.5 → 0.2
 
         [Header("슬롯 배당률")]
         public float drawMultiplier = 1f;
         public float miniWinMultiplier = 1.5f;
         public float smallWinMultiplier = 2f;
-        public float bigWinMultiplier = 5f;
-        public float jackpotMultiplier = 10f;
-        public float megaJackpotMultiplier = 100f;
+        public float bigWinMultiplier = 4f;     // 5 → 4
+        public float jackpotMultiplier = 8f;    // 10 → 8
+        public float megaJackpotMultiplier = 50f; // 100 → 50
 
         [Header("=== 베팅 설정 ===")]
         public float[] betPercentages = { 0.1f, 0.3f, 0.5f, 1f };
