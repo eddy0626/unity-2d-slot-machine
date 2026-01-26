@@ -176,21 +176,22 @@ namespace SlotClicker.UI
                 GameObject reelBg = CreatePanel(slotRect, $"ReelBg_{i}",
                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                     new Vector2(startX + (i * spacing), 0), new Vector2(120, 120),
-                    new Color(0.05f, 0.05f, 0.1f, 1f));
+                    new Color(0.2f, 0.15f, 0.25f, 1f));
 
-                // 릴 배경에 마스크 추가 (심볼이 영역 밖으로 나가지 않도록)
-                reelBg.AddComponent<Mask>().showMaskGraphic = true;
+                // RectMask2D 사용 (Mask보다 간단하고 스프라이트 불필요)
+                reelBg.AddComponent<RectMask2D>();
 
                 GameObject symbolObj = new GameObject($"Symbol_{i}");
                 symbolObj.transform.SetParent(reelBg.transform, false);
                 RectTransform symRect = symbolObj.AddComponent<RectTransform>();
                 symRect.anchorMin = Vector2.zero;
                 symRect.anchorMax = Vector2.one;
-                symRect.offsetMin = new Vector2(8, 8);
-                symRect.offsetMax = new Vector2(-8, -8);
+                symRect.offsetMin = new Vector2(5, 5);
+                symRect.offsetMax = new Vector2(-5, -5);
 
                 _reelSymbols[i] = symbolObj.AddComponent<Image>();
                 _reelSymbols[i].preserveAspect = true;
+                _reelSymbols[i].raycastTarget = false; // 클릭 방해 방지
 
                 // 초기 스프라이트 설정
                 Sprite sprite = GetSymbolSprite(i);
@@ -198,10 +199,12 @@ namespace SlotClicker.UI
                 {
                     _reelSymbols[i].sprite = sprite;
                     _reelSymbols[i].color = Color.white;
+                    Debug.Log($"[SlotClickerUI] Reel {i} sprite set: {sprite.name}");
                 }
                 else
                 {
                     _reelSymbols[i].color = GetSymbolColor(i);
+                    Debug.LogWarning($"[SlotClickerUI] Reel {i} using fallback color (no sprite)");
                 }
             }
         }
@@ -398,21 +401,35 @@ namespace SlotClicker.UI
 
             if (_symbolSprites == null || _symbolSprites.Length == 0)
             {
-                Debug.LogWarning("[SlotClickerUI] Failed to load symbol sprites from Resources/Sprites/SymbolSprites");
-                // 기본 스프라이트 생성 (fallback)
-                _symbolSprites = new Sprite[7];
+                Debug.LogWarning("[SlotClickerUI] Failed to load from 'Sprites/SymbolSprites', trying alternative paths...");
+
+                // 대안 경로 시도
+                _symbolSprites = Resources.LoadAll<Sprite>("SymbolSprites");
+
+                if (_symbolSprites == null || _symbolSprites.Length == 0)
+                {
+                    Debug.LogError("[SlotClickerUI] Could not load symbol sprites! Using fallback colors.");
+                    _symbolSprites = null;
+                }
             }
-            else
+
+            if (_symbolSprites != null && _symbolSprites.Length > 0)
             {
-                Debug.Log($"[SlotClickerUI] Loaded {_symbolSprites.Length} symbol sprites");
+                Debug.Log($"[SlotClickerUI] Successfully loaded {_symbolSprites.Length} symbol sprites");
+                // 스프라이트 이름 로깅
+                for (int i = 0; i < Mathf.Min(3, _symbolSprites.Length); i++)
+                {
+                    Debug.Log($"  - Sprite {i}: {_symbolSprites[i].name}");
+                }
             }
         }
 
         private Sprite GetSymbolSprite(int index)
         {
-            if (_symbolSprites != null && _symbolSprites.Length > 0)
+            if (_symbolSprites != null && _symbolSprites.Length > 0 && index >= 0)
             {
-                return _symbolSprites[index % _symbolSprites.Length];
+                int safeIndex = index % _symbolSprites.Length;
+                return _symbolSprites[safeIndex];
             }
             return null;
         }
