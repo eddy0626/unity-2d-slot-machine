@@ -32,6 +32,27 @@ namespace SlotMachine.Core
         [SerializeField] private float winShakeStrength = 10f;
         [SerializeField] private float coinCountDuration = 0.5f;
 
+        [Header("Advanced Features")]
+        [SerializeField] private bool enableAutoSpin = true;
+        [SerializeField] private bool enableTurbo = true;
+        [SerializeField] private float turboMultiplier = 0.5f;
+        [SerializeField] private float autoSpinDelay = 0.2f;
+
+        [Header("Jackpot Settings")]
+        [SerializeField] private int jackpotStart = 5000;
+        [SerializeField] [Range(0f, 0.2f)] private float jackpotContributionRate = 0.02f;
+        [SerializeField] private int jackpotSymbolIndex = 12;
+
+        [Header("Scatter / Free Spins")]
+        [SerializeField] private int wildSymbolIndex = 12;
+        [SerializeField] private int scatterSymbolIndex = 13;
+        [SerializeField] private int scatterFreeSpins = 5;
+        [SerializeField] private int scatterExtraSpinsPerAdditional = 2;
+        [SerializeField] private int scatterPayoutMultiplier = 2;
+
+        [Header("RNG Weights (Optional)")]
+        [SerializeField] private int[] symbolWeights;
+
         [Header("Sprites (Auto-loaded from Resources)")]
         [SerializeField] private Sprite[] _symbolSprites;
         [SerializeField] private Sprite _machineFrameSprite;
@@ -43,8 +64,15 @@ namespace SlotMachine.Core
         private TextMeshProUGUI _betText;
         private TextMeshProUGUI _winText;
         private Button _spinButton;
+        private TextMeshProUGUI _spinButtonText;
         private Button _betUpButton;
         private Button _betDownButton;
+        private Button _autoSpinButton;
+        private TextMeshProUGUI _autoSpinText;
+        private Button _turboButton;
+        private TextMeshProUGUI _turboText;
+        private TextMeshProUGUI _jackpotText;
+        private TextMeshProUGUI _freeSpinsText;
 
         // Reel data
         private Image[][] _symbolImages;
@@ -54,8 +82,26 @@ namespace SlotMachine.Core
         private bool _isSpinning;
         private int _currentCoins;
         private int _displayedCoins;
+        private int _jackpotValue;
+        private int _freeSpinsRemaining;
+        private bool _autoSpinEnabled;
+        private bool _turboEnabled;
         private CanvasGroup _canvasGroup;
         private RectTransform _reelContainer;
+        private int _lastScatterCount;
+        private int _lastFreeSpinsAwarded;
+        private bool _lastJackpotHit;
+        private readonly List<int> _lastWinningPositions = new List<int>();
+        private readonly List<int> _lastScatterPositions = new List<int>();
+
+        private static readonly int[][] _paylines = new int[][]
+        {
+            new int[] { 3, 4, 5 },  // Center
+            new int[] { 0, 1, 2 },  // Top
+            new int[] { 6, 7, 8 },  // Bottom
+            new int[] { 0, 4, 8 },  // Diagonal ↘
+            new int[] { 6, 4, 2 }   // Diagonal ↗
+        };
 
         // Symbol colors (demo용 색상으로 구분) - 16개
         private readonly Color[] _symbolColors = new Color[]
@@ -101,7 +147,14 @@ namespace SlotMachine.Core
             _currentCoins = startCoins;
             _displayedCoins = startCoins;
             currentBet = betOptions[betIndex];
+            _jackpotValue = jackpotStart;
+            _autoSpinEnabled = false;
+            _turboEnabled = false;
             CreateUI();
+            UpdateStatusUI();
+            UpdateAutoSpinButton();
+            UpdateTurboButton();
+            UpdateSpinButtonLabel();
 
             // 시작 시 페이드 인 효과
             if (_canvasGroup != null)
@@ -151,6 +204,9 @@ namespace SlotMachine.Core
 
             // Reel Container
             CreateReels(main.transform);
+
+            // Status Panel (Jackpot / Free Spins)
+            CreateStatusPanel(main.transform);
 
             // UI Panel
             CreateUIPanel(main.transform);
@@ -224,6 +280,42 @@ namespace SlotMachine.Core
                 CreateReel(container.transform, r);
             }
             */
+        }
+
+        private void CreateStatusPanel(Transform parent)
+        {
+            GameObject status = CreatePanel("StatusPanel", parent);
+            RectTransform statusRT = status.GetComponent<RectTransform>();
+            statusRT.anchorMin = new Vector2(0.5f, 0.5f);
+            statusRT.anchorMax = new Vector2(0.5f, 0.5f);
+            statusRT.anchoredPosition = new Vector2(0, 220);
+            statusRT.sizeDelta = new Vector2(600, 60);
+
+            Image bg = status.GetComponent<Image>();
+            bg.color = new Color(0.1f, 0.06f, 0.15f, 0.6f);
+            bg.raycastTarget = false;
+
+            GameObject jackpotObj = CreateText("JackpotText", status.transform, "JACKPOT 0", 28, new Color(1f, 0.84f, 0.2f));
+            _jackpotText = jackpotObj.GetComponent<TextMeshProUGUI>();
+            _jackpotText.fontStyle = FontStyles.Bold;
+            _jackpotText.alignment = TextAlignmentOptions.Left;
+            RectTransform jackpotRT = jackpotObj.GetComponent<RectTransform>();
+            jackpotRT.anchorMin = new Vector2(0, 0.5f);
+            jackpotRT.anchorMax = new Vector2(0, 0.5f);
+            jackpotRT.pivot = new Vector2(0, 0.5f);
+            jackpotRT.anchoredPosition = new Vector2(20, 0);
+            jackpotRT.sizeDelta = new Vector2(280, 50);
+
+            GameObject freeObj = CreateText("FreeSpinsText", status.transform, "FREE 0", 24, new Color(1f, 0.4f, 1f));
+            _freeSpinsText = freeObj.GetComponent<TextMeshProUGUI>();
+            _freeSpinsText.fontStyle = FontStyles.Bold;
+            _freeSpinsText.alignment = TextAlignmentOptions.Right;
+            RectTransform freeRT = freeObj.GetComponent<RectTransform>();
+            freeRT.anchorMin = new Vector2(1, 0.5f);
+            freeRT.anchorMax = new Vector2(1, 0.5f);
+            freeRT.pivot = new Vector2(1, 0.5f);
+            freeRT.anchoredPosition = new Vector2(-20, 0);
+            freeRT.sizeDelta = new Vector2(240, 50);
         }
 
         private void CreateReelsWithFrame(Transform parent)
@@ -381,8 +473,20 @@ namespace SlotMachine.Core
             symbolRT.sizeDelta = new Vector2(130, 130);
 
             Image img = symbol.GetComponent<Image>();
-            int randomSymbol = Random.Range(0, _symbolColors.Length);
-            img.color = _symbolColors[randomSymbol];
+            int randomSymbol = GetRandomSymbolIndex();
+            bool useSprite = _symbolSprites != null && _symbolSprites.Length > 0 &&
+                             randomSymbol < _symbolSprites.Length && _symbolSprites[randomSymbol] != null;
+
+            if (useSprite)
+            {
+                img.sprite = _symbolSprites[randomSymbol];
+                img.color = Color.white;
+            }
+            else
+            {
+                img.sprite = null;
+                img.color = _symbolColors[randomSymbol % _symbolColors.Length];
+            }
             _symbolImages[reelIndex][symbolIndex] = img;
             _symbolTransforms[reelIndex][symbolIndex] = symbolRT;
             _originalSymbolPositions[reelIndex][symbolIndex] = symbolRT.anchoredPosition; // 원래 위치 저장
@@ -393,7 +497,7 @@ namespace SlotMachine.Core
             textObj.transform.SetParent(symbol.transform, false);
 
             TextMeshProUGUI text = textObj.AddComponent<TextMeshProUGUI>();
-            text.text = _symbolNames[randomSymbol];
+            text.text = useSprite ? "" : _symbolNames[randomSymbol % _symbolNames.Length];
             text.fontSize = 48;
             text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
@@ -421,6 +525,9 @@ namespace SlotMachine.Core
 
             // Spin Button
             CreateSpinButton(panel.transform);
+
+            // Auto/Turbo Controls
+            CreateAutoControls(panel.transform);
 
             // Win
             CreateWinDisplay(panel.transform);
@@ -489,11 +596,37 @@ namespace SlotMachine.Core
             rt.anchorMax = new Vector2(0.5f, 0.5f);
 
             _spinButton.GetComponent<Image>().color = new Color(0f, 0.9f, 0.7f);
-            _spinButton.GetComponentInChildren<TextMeshProUGUI>().fontSize = 28;
+            _spinButtonText = _spinButton.GetComponentInChildren<TextMeshProUGUI>();
+            _spinButtonText.fontSize = 28;
             _spinButton.onClick.AddListener(Spin);
 
             // DOTween 버튼 바운스 효과 추가
             AddButtonBounceEffect(_spinButton);
+        }
+
+        private void CreateAutoControls(Transform parent)
+        {
+            if (enableTurbo)
+            {
+                _turboButton = CreateButton("TurboButton", parent, "TURBO OFF", new Vector2(160, 50), new Vector2(120, 32));
+                _turboButton.GetComponent<Image>().color = new Color(0.2f, 0.12f, 0.3f);
+                _turboText = _turboButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (_turboText != null)
+                    _turboText.fontSize = 18;
+                _turboButton.onClick.AddListener(ToggleTurbo);
+                AddButtonBounceEffect(_turboButton);
+            }
+
+            if (enableAutoSpin)
+            {
+                _autoSpinButton = CreateButton("AutoSpinButton", parent, "AUTO OFF", new Vector2(160, -50), new Vector2(120, 32));
+                _autoSpinButton.GetComponent<Image>().color = new Color(0.2f, 0.12f, 0.3f);
+                _autoSpinText = _autoSpinButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (_autoSpinText != null)
+                    _autoSpinText.fontSize = 18;
+                _autoSpinButton.onClick.AddListener(ToggleAutoSpin);
+                AddButtonBounceEffect(_autoSpinButton);
+            }
         }
 
         private void AddButtonBounceEffect(Button button)
@@ -534,10 +667,88 @@ namespace SlotMachine.Core
 
         #region Game Logic
 
+        private bool CanSpin()
+        {
+            return !_isSpinning && (_freeSpinsRemaining > 0 || _currentCoins >= currentBet);
+        }
+
+        private int GetSymbolCount()
+        {
+            return _symbolSprites != null && _symbolSprites.Length > 0 ? _symbolSprites.Length : _symbolColors.Length;
+        }
+
+        private int GetRandomSymbolIndex()
+        {
+            int symbolCount = GetSymbolCount();
+
+            if (symbolWeights != null && symbolWeights.Length >= symbolCount)
+            {
+                int totalWeight = 0;
+                for (int i = 0; i < symbolCount; i++)
+                {
+                    totalWeight += Mathf.Max(0, symbolWeights[i]);
+                }
+
+                if (totalWeight > 0)
+                {
+                    int roll = Random.Range(0, totalWeight);
+                    int cumulative = 0;
+                    for (int i = 0; i < symbolCount; i++)
+                    {
+                        cumulative += Mathf.Max(0, symbolWeights[i]);
+                        if (roll < cumulative)
+                            return i;
+                    }
+                }
+            }
+
+            return Random.Range(0, symbolCount);
+        }
+
+        private bool IsWild(int symbolIndex)
+        {
+            return symbolIndex == wildSymbolIndex;
+        }
+
+        private bool IsScatter(int symbolIndex)
+        {
+            return symbolIndex == scatterSymbolIndex;
+        }
+
+        private bool IsJackpotSymbol(int symbolIndex)
+        {
+            return symbolIndex == jackpotSymbolIndex;
+        }
+
+        private void ToggleAutoSpin()
+        {
+            if (!enableAutoSpin)
+                return;
+
+            _autoSpinEnabled = !_autoSpinEnabled;
+            UpdateAutoSpinButton();
+
+            if (_autoSpinEnabled)
+            {
+                QueueNextAutoSpin();
+            }
+        }
+
+        private void ToggleTurbo()
+        {
+            if (!enableTurbo)
+                return;
+
+            _turboEnabled = !_turboEnabled;
+            UpdateTurboButton();
+        }
+
         private void Spin()
         {
             if (_isSpinning) return;
-            if (_currentCoins < currentBet)
+            bool isFreeSpin = _freeSpinsRemaining > 0;
+
+            if (!isFreeSpin && _currentCoins < currentBet)
             {
                 // 코인 부족 애니메이션
                 _winText.text = "NO COINS!";
@@ -557,11 +768,27 @@ namespace SlotMachine.Core
                         .OnComplete(() => _coinText.color = new Color(1f, 0.84f, 0f));
                     _coinText.transform.DOShakePosition(0.3f, 5f, 15, 90, false, true);
                 }
+                if (_autoSpinEnabled)
+                {
+                    _autoSpinEnabled = false;
+                    UpdateAutoSpinButton();
+                }
                 return;
             }
 
-            _currentCoins -= currentBet;
-            _displayedCoins = _currentCoins; // 즉시 반영
+            if (!isFreeSpin)
+            {
+                _currentCoins -= currentBet;
+                _displayedCoins = _currentCoins; // 즉시 반영
+                AddJackpotContribution();
+            }
+            else
+            {
+                _freeSpinsRemaining--;
+                UpdateStatusUI();
+                UpdateSpinButtonLabel();
+            }
+
             UpdateUI();
             StartCoroutine(SpinCoroutine());
         }
@@ -572,17 +799,19 @@ namespace SlotMachine.Core
             _spinButton.interactable = false;
             _winText.text = "";
             _winText.transform.localScale = Vector3.one;
+            if (_betUpButton != null) _betUpButton.interactable = false;
+            if (_betDownButton != null) _betDownButton.interactable = false;
+            UpdateSpinButtonLabel();
 
             // 모든 심볼 위치/스케일 리셋
             ResetAllSymbolTransforms();
 
             // Generate results
-            int symbolCount = _symbolSprites != null && _symbolSprites.Length > 0 ? _symbolSprites.Length : _symbolColors.Length;
             for (int r = 0; r < 3; r++)
             {
                 for (int s = 0; s < 3; s++)
                 {
-                    _reelResults[r][s] = Random.Range(0, symbolCount);
+                    _reelResults[r][s] = GetRandomSymbolIndex();
                 }
             }
 
@@ -604,8 +833,9 @@ namespace SlotMachine.Core
             yield return new WaitForSeconds(0.1f);
 
             // DOTween 기반 스핀 애니메이션
-            float spinInterval = symbolSpinSpeed;
-            float accelerationTime = 0.3f;
+            float speedScale = _turboEnabled ? Mathf.Clamp(turboMultiplier, 0.2f, 1f) : 1f;
+            float spinInterval = Mathf.Max(0.02f, symbolSpinSpeed * speedScale);
+            float accelerationTime = 0.3f * speedScale;
             float currentInterval = spinInterval * 3f; // 느리게 시작
             float elapsed = 0f;
             bool[] reelStopped = new bool[3];
@@ -619,7 +849,7 @@ namespace SlotMachine.Core
                 {
                     for (int s = 0; s < 3; s++)
                     {
-                        int randomSymbol = Random.Range(0, symbolCount);
+                        int randomSymbol = GetRandomSymbolIndex();
                         SetSymbolDisplayWithAnimation(r, s, randomSymbol, currentInterval * 0.5f);
                     }
                 }
@@ -630,7 +860,8 @@ namespace SlotMachine.Core
 
             // 일정 속도 스핀
             elapsed = 0f;
-            while (elapsed < spinDuration)
+            float scaledSpinDuration = spinDuration * speedScale;
+            while (elapsed < scaledSpinDuration)
             {
                 for (int r = 0; r < 3; r++)
                 {
@@ -638,7 +869,7 @@ namespace SlotMachine.Core
                     {
                         for (int s = 0; s < 3; s++)
                         {
-                            int randomSymbol = Random.Range(0, symbolCount);
+                            int randomSymbol = GetRandomSymbolIndex();
                             SetSymbolDisplayWithAnimation(r, s, randomSymbol, spinInterval * 0.5f);
                         }
                     }
@@ -659,7 +890,7 @@ namespace SlotMachine.Core
                     float slowInterval = spinInterval * (1f + i * 0.5f);
                     for (int s = 0; s < 3; s++)
                     {
-                        int randomSymbol = Random.Range(0, symbolCount);
+                        int randomSymbol = GetRandomSymbolIndex();
                         SetSymbolDisplayWithAnimation(r, s, randomSymbol, slowInterval * 0.5f);
                     }
                     yield return new WaitForSeconds(slowInterval);
@@ -687,7 +918,7 @@ namespace SlotMachine.Core
                 }
 
                 // 릴 정지 사운드 효과를 위한 딜레이
-                yield return new WaitForSeconds(reelStopDelay);
+                yield return new WaitForSeconds(reelStopDelay * speedScale);
             }
 
             yield return new WaitForSeconds(0.2f);
@@ -695,16 +926,21 @@ namespace SlotMachine.Core
             // 당첨 확인
             int winAmount = CheckWins();
             if (winAmount > 0)
-            {
                 _currentCoins += winAmount;
+
+            if (winAmount > 0 || _lastFreeSpinsAwarded > 0 || _lastJackpotHit)
                 PlayWinAnimation(winAmount);
-            }
 
             // 코인 카운터 애니메이션
             AnimateCoinCounter();
 
             _isSpinning = false;
-            _spinButton.interactable = true;
+            _spinButton.interactable = CanSpin();
+            if (_betUpButton != null) _betUpButton.interactable = true;
+            if (_betDownButton != null) _betDownButton.interactable = true;
+            UpdateSpinButtonLabel();
+
+            QueueNextAutoSpin();
         }
 
         private void ResetAllSymbolTransforms()
@@ -761,44 +997,135 @@ namespace SlotMachine.Core
             }
         }
 
+        private int GetSymbolAtGridIndex(int gridIndex)
+        {
+            int row = Mathf.Clamp(gridIndex / 3, 0, 2);
+            int col = Mathf.Clamp(gridIndex % 3, 0, 2);
+            return _reelResults[col][row];
+        }
+
+        private bool TryGetPaylineWin(int[] payline, out int symbolIndex)
+        {
+            symbolIndex = -1;
+
+            for (int i = 0; i < payline.Length; i++)
+            {
+                int symbol = GetSymbolAtGridIndex(payline[i]);
+
+                if (IsScatter(symbol))
+                    return false;
+
+                if (!IsWild(symbol))
+                {
+                    if (symbolIndex == -1)
+                    {
+                        symbolIndex = symbol;
+                    }
+                    else if (symbolIndex != symbol)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            if (symbolIndex == -1)
+                symbolIndex = wildSymbolIndex; // 모두 WILD인 경우
+
+            return true;
+        }
+
+        private int GetSymbolPayout(int symbolIndex)
+        {
+            if (_symbolPayouts == null || _symbolPayouts.Length == 0)
+                return 0;
+
+            int idx = Mathf.Clamp(symbolIndex, 0, _symbolPayouts.Length - 1);
+            return _symbolPayouts[idx];
+        }
+
+        private void AddPositions(List<int> target, int[] positions)
+        {
+            for (int i = 0; i < positions.Length; i++)
+            {
+                target.Add(positions[i]);
+            }
+        }
+
+        private bool IsJackpotTriggered()
+        {
+            int a = _reelResults[0][1];
+            int b = _reelResults[1][1];
+            int c = _reelResults[2][1];
+            return IsJackpotSymbol(a) && IsJackpotSymbol(b) && IsJackpotSymbol(c);
+        }
+
+        private void AwardFreeSpins(int count)
+        {
+            if (count <= 0)
+                return;
+
+            _freeSpinsRemaining += count;
+            UpdateStatusUI();
+            UpdateSpinButtonLabel();
+
+            if (_freeSpinsText != null)
+            {
+                _freeSpinsText.DOKill();
+                _freeSpinsText.transform.DOPunchScale(Vector3.one * 0.1f, 0.3f, 4, 0.5f);
+            }
+        }
+
         private int CheckWins()
         {
+            _lastWinningPositions.Clear();
+            _lastScatterPositions.Clear();
+            _lastScatterCount = 0;
+            _lastFreeSpinsAwarded = 0;
+            _lastJackpotHit = false;
+
             int totalWin = 0;
-            int maxIndex = _symbolPayouts.Length - 1;
 
-            // Check middle row (most common payline)
-            if (_reelResults[0][1] == _reelResults[1][1] && _reelResults[1][1] == _reelResults[2][1])
+            // Payline wins (WILD 지원)
+            for (int i = 0; i < _paylines.Length; i++)
             {
-                int idx = Mathf.Clamp(_reelResults[0][1], 0, maxIndex);
-                totalWin += _symbolPayouts[idx] * currentBet;
+                if (TryGetPaylineWin(_paylines[i], out int symbolIndex))
+                {
+                    int payout = GetSymbolPayout(symbolIndex) * currentBet;
+                    if (payout > 0)
+                    {
+                        totalWin += payout;
+                        AddPositions(_lastWinningPositions, _paylines[i]);
+                    }
+                }
             }
 
-            // Check top row
-            if (_reelResults[0][0] == _reelResults[1][0] && _reelResults[1][0] == _reelResults[2][0])
+            // Scatter wins (라인 무관)
+            int scatterCount = 0;
+            for (int i = 0; i < 9; i++)
             {
-                int idx = Mathf.Clamp(_reelResults[0][0], 0, maxIndex);
-                totalWin += _symbolPayouts[idx] * currentBet;
+                int symbol = GetSymbolAtGridIndex(i);
+                if (IsScatter(symbol))
+                {
+                    scatterCount++;
+                    _lastScatterPositions.Add(i);
+                }
             }
 
-            // Check bottom row
-            if (_reelResults[0][2] == _reelResults[1][2] && _reelResults[1][2] == _reelResults[2][2])
+            if (scatterCount >= 3)
             {
-                int idx = Mathf.Clamp(_reelResults[0][2], 0, maxIndex);
-                totalWin += _symbolPayouts[idx] * currentBet;
+                totalWin += scatterPayoutMultiplier * currentBet * scatterCount;
+                _lastScatterCount = scatterCount;
+                _lastFreeSpinsAwarded = scatterFreeSpins + (scatterCount - 3) * scatterExtraSpinsPerAdditional;
+                AwardFreeSpins(_lastFreeSpinsAwarded);
             }
 
-            // Diagonal top-left to bottom-right
-            if (_reelResults[0][0] == _reelResults[1][1] && _reelResults[1][1] == _reelResults[2][2])
+            // Jackpot (중앙 라인 3개 지정 심볼)
+            if (IsJackpotTriggered())
             {
-                int idx = Mathf.Clamp(_reelResults[0][0], 0, maxIndex);
-                totalWin += _symbolPayouts[idx] * currentBet;
-            }
-
-            // Diagonal bottom-left to top-right
-            if (_reelResults[0][2] == _reelResults[1][1] && _reelResults[1][1] == _reelResults[2][0])
-            {
-                int idx = Mathf.Clamp(_reelResults[0][2], 0, maxIndex);
-                totalWin += _symbolPayouts[idx] * currentBet;
+                _lastJackpotHit = true;
+                totalWin += _jackpotValue;
+                _jackpotValue = jackpotStart;
+                UpdateStatusUI();
             }
 
             return totalWin;
@@ -807,8 +1134,21 @@ namespace SlotMachine.Core
         private void PlayWinAnimation(int winAmount)
         {
             // WIN 텍스트 설정
-            _winText.text = $"+{winAmount:N0}";
-            _winText.color = new Color(0f, 1f, 0.6f);
+            if (_lastJackpotHit)
+            {
+                _winText.text = $"JACKPOT!\n+{winAmount:N0}";
+                _winText.color = new Color(1f, 0.6f, 0.1f);
+            }
+            else if (_lastFreeSpinsAwarded > 0)
+            {
+                _winText.text = $"+{winAmount:N0}\nFREE +{_lastFreeSpinsAwarded}";
+                _winText.color = new Color(1f, 0.4f, 1f);
+            }
+            else
+            {
+                _winText.text = $"+{winAmount:N0}";
+                _winText.color = new Color(0f, 1f, 0.6f);
+            }
 
             // WIN 텍스트 펀치 스케일 애니메이션
             _winText.transform.DOKill();
@@ -835,28 +1175,47 @@ namespace SlotMachine.Core
 
         private void HighlightWinningSymbols()
         {
-            // 중간 라인 체크 (가장 일반적인 페이라인)
-            if (_reelResults[0][1] == _reelResults[1][1] && _reelResults[1][1] == _reelResults[2][1])
+            if (_lastWinningPositions.Count > 0)
             {
-                for (int r = 0; r < 3; r++)
+                HighlightPositions(_lastWinningPositions, Color.white, 1.15f);
+            }
+
+            if (_lastScatterPositions.Count > 0)
+            {
+                HighlightPositions(_lastScatterPositions, new Color(1f, 0.3f, 1f), 1.12f);
+            }
+        }
+
+        private void HighlightPositions(List<int> positions, Color color, float scale)
+        {
+            bool[] used = new bool[9];
+
+            for (int i = 0; i < positions.Count; i++)
+            {
+                int pos = positions[i];
+                if (pos < 0 || pos >= 9 || used[pos])
+                    continue;
+
+                used[pos] = true;
+
+                int row = pos / 3;
+                int reel = pos % 3;
+
+                RectTransform rt = _symbolTransforms[reel][row];
+                Image img = _symbolImages[reel][row];
+
+                if (rt != null)
                 {
-                    if (_symbolTransforms[r][1] != null)
-                    {
-                        RectTransform rt = _symbolTransforms[r][1];
-                        Image img = _symbolImages[r][1];
+                    rt.DOKill();
+                    rt.DOScale(Vector3.one * scale, 0.25f).SetLoops(4, LoopType.Yoyo).SetEase(Ease.InOutQuad);
+                }
 
-                        // 펄스 스케일 효과
-                        rt.DOKill();
-                        rt.DOScale(Vector3.one * 1.15f, 0.3f).SetLoops(4, LoopType.Yoyo).SetEase(Ease.InOutQuad);
-
-                        // 글로우 색상 효과
-                        if (img != null)
-                        {
-                            Color originalColor = img.color;
-                            img.DOColor(Color.white, 0.15f).SetLoops(6, LoopType.Yoyo)
-                                .OnComplete(() => img.color = originalColor);
-                        }
-                    }
+                if (img != null)
+                {
+                    Color originalColor = img.color;
+                    img.DOKill();
+                    img.DOColor(color, 0.15f).SetLoops(4, LoopType.Yoyo)
+                        .OnComplete(() => img.color = originalColor);
                 }
             }
         }
@@ -947,6 +1306,94 @@ namespace SlotMachine.Core
 
             if (_betText != null)
                 _betText.text = currentBet.ToString("N0");
+
+            if (_spinButton != null && !_isSpinning)
+                _spinButton.interactable = CanSpin();
+
+            UpdateSpinButtonLabel();
+            UpdateStatusUI();
+        }
+
+        private void UpdateStatusUI()
+        {
+            if (_jackpotText != null)
+                _jackpotText.text = $"JACKPOT {_jackpotValue:N0}";
+
+            if (_freeSpinsText != null)
+                _freeSpinsText.text = _freeSpinsRemaining > 0 ? $"FREE {_freeSpinsRemaining}" : "FREE 0";
+        }
+
+        private void UpdateSpinButtonLabel()
+        {
+            if (_spinButtonText == null)
+                return;
+
+            _spinButtonText.text = _freeSpinsRemaining > 0 ? $"FREE {_freeSpinsRemaining}" : "SPIN";
+        }
+
+        private void UpdateAutoSpinButton()
+        {
+            if (_autoSpinButton == null || _autoSpinText == null)
+                return;
+
+            _autoSpinText.text = _autoSpinEnabled ? "AUTO ON" : "AUTO OFF";
+            _autoSpinButton.GetComponent<Image>().color = _autoSpinEnabled
+                ? new Color(1f, 0.6f, 0.2f)
+                : new Color(0.2f, 0.12f, 0.3f);
+        }
+
+        private void UpdateTurboButton()
+        {
+            if (_turboButton == null || _turboText == null)
+                return;
+
+            _turboText.text = _turboEnabled ? "TURBO ON" : "TURBO OFF";
+            _turboButton.GetComponent<Image>().color = _turboEnabled
+                ? new Color(0.2f, 0.9f, 1f)
+                : new Color(0.2f, 0.12f, 0.3f);
+        }
+
+        private void AddJackpotContribution()
+        {
+            if (jackpotContributionRate <= 0f)
+                return;
+
+            int add = Mathf.Max(1, Mathf.RoundToInt(currentBet * jackpotContributionRate));
+            _jackpotValue += add;
+            UpdateStatusUI();
+        }
+
+        private void QueueNextAutoSpin()
+        {
+            if (!_autoSpinEnabled)
+                return;
+
+            if (_isSpinning)
+                return;
+
+            if (!CanSpin())
+            {
+                _autoSpinEnabled = false;
+                UpdateAutoSpinButton();
+                return;
+            }
+
+            StartCoroutine(AutoSpinDelayThenSpin());
+        }
+
+        private IEnumerator AutoSpinDelayThenSpin()
+        {
+            yield return new WaitForSeconds(autoSpinDelay);
+
+            if (_autoSpinEnabled && CanSpin())
+            {
+                Spin();
+            }
+            else if (_autoSpinEnabled && !CanSpin())
+            {
+                _autoSpinEnabled = false;
+                UpdateAutoSpinButton();
+            }
         }
 
         #endregion
