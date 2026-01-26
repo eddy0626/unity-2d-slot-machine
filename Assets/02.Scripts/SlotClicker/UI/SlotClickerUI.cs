@@ -202,8 +202,8 @@ namespace SlotClicker.UI
             GameObject hudPanel = CreatePanel(parent, "TopHUD", new Vector2(0, 1), new Vector2(1, 1),
                 new Vector2(0, 0), new Vector2(0, 0), new Color(0.1f, 0.1f, 0.15f, 0.95f));
             RectTransform hudRect = hudPanel.GetComponent<RectTransform>();
-            hudRect.anchoredPosition = new Vector2(0, -60); // 상단에서 60px
-            hudRect.sizeDelta = new Vector2(0, 120); // 높이 증가
+            hudRect.anchoredPosition = new Vector2(0, -50); // 상단에서 50px
+            hudRect.sizeDelta = new Vector2(0, 100); // 높이 100px
 
             // 골드 표시 (상단 좌측)
             GameObject goldObj = CreateTextObject(hudRect, "GoldText", "GOLD: 0",
@@ -243,9 +243,9 @@ namespace SlotClicker.UI
 
         private void CreateSlotArea(RectTransform parent)
         {
-            // 슬롯 패널 - 상단 HUD 아래에 배치
+            // 슬롯 패널 - 상단 HUD 아래에 배치 (HUD 끝 -150 + 30px 간격 = -180)
             GameObject slotPanel = CreatePanel(parent, "SlotPanel", new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, -200), new Vector2(550, 180), new Color(0.15f, 0.1f, 0.2f, 1f));
+                new Vector2(0, -180), new Vector2(520, 160), new Color(0.15f, 0.1f, 0.2f, 1f));
             RectTransform slotRect = slotPanel.GetComponent<RectTransform>();
             _slotAreaRect = slotRect;
 
@@ -262,14 +262,14 @@ namespace SlotClicker.UI
 
             // 릴 심볼들
             _reelSymbols = new Image[3];
-            float spacing = 160f;
+            float spacing = 150f;  // 슬롯 패널 크기에 맞게 조정
             float startX = -spacing;
 
             for (int i = 0; i < 3; i++)
             {
                 GameObject reelBg = CreatePanel(slotRect, $"ReelBg_{i}",
                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                    new Vector2(startX + (i * spacing), 0), new Vector2(120, 120),
+                    new Vector2(startX + (i * spacing), 0), new Vector2(110, 110),
                     _reelFrameBaseColor);
 
                 // RectMask2D 사용 (Mask보다 간단하고 스프라이트 불필요)
@@ -306,9 +306,9 @@ namespace SlotClicker.UI
 
         private void CreateClickArea(RectTransform parent)
         {
-            // 클릭 영역 (카지노 테이블) - 화면 중앙 아래쪽
+            // 클릭 영역 (카지노 테이블) - 화면 중앙 아래쪽 (슬롯과 베팅 UI 사이)
             GameObject clickPanel = CreatePanel(parent, "ClickArea", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(0, -50), new Vector2(650, 280), new Color(0.1f, 0.4f, 0.15f, 1f));
+                new Vector2(0, -80), new Vector2(520, 200), new Color(0.1f, 0.4f, 0.15f, 1f));
             RectTransform clickRect = clickPanel.GetComponent<RectTransform>();
 
             AddOutline(clickPanel, new Color(0.6f, 0.4f, 0.1f), 5);
@@ -333,9 +333,9 @@ namespace SlotClicker.UI
         {
             // 베팅 패널 - 하단에 고정
             GameObject betPanel = CreatePanel(parent, "BetPanel", new Vector2(0, 0), new Vector2(1, 0),
-                new Vector2(0, 0), new Vector2(0, 250), new Color(0.12f, 0.1f, 0.18f, 0.95f));
+                new Vector2(0, 0), new Vector2(0, 220), new Color(0.12f, 0.1f, 0.18f, 0.95f));
             RectTransform betRect = betPanel.GetComponent<RectTransform>();
-            betRect.anchoredPosition = new Vector2(0, 125); // 하단에서 125px 위
+            betRect.anchoredPosition = new Vector2(0, 110); // 하단에서 110px 위
 
             // 현재 베팅액 표시
             GameObject betAmountObj = CreateTextObject(betRect, "BetAmountText", "Bet: 0",
@@ -348,8 +348,8 @@ namespace SlotClicker.UI
             _betButtons = new Button[4];
             string[] betLabels = { "10%", "30%", "50%", "ALL" };
             float[] betValues = { 0.1f, 0.3f, 0.5f, 1f };
-            float buttonWidth = 130f;
-            float buttonSpacing = 15f;
+            float buttonWidth = 120f;  // 버튼 폭 조정
+            float buttonSpacing = 12f;  // 간격 조정
             float totalWidth = (buttonWidth * 4) + (buttonSpacing * 3);
             float startX = -totalWidth / 2 + buttonWidth / 2;
 
@@ -360,8 +360,8 @@ namespace SlotClicker.UI
 
                 GameObject btnObj = CreateButton(betRect, $"BetBtn_{i}", betLabels[i],
                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                    new Vector2(startX + (i * (buttonWidth + buttonSpacing)), 30),
-                    new Vector2(buttonWidth, 50),
+                    new Vector2(startX + (i * (buttonWidth + buttonSpacing)), 35),
+                    new Vector2(buttonWidth, 45),
                     new Color(0.3f, 0.3f, 0.5f));
 
                 _betButtons[i] = btnObj.GetComponent<Button>();
@@ -371,25 +371,25 @@ namespace SlotClicker.UI
             // 스핀 버튼 - 하단에 배치 (좌측으로 이동)
             GameObject spinObj = CreateButton(betRect, "SpinButton", "SPIN!",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(-70, 45), new Vector2(200, 65),
+                new Vector2(-60, 40), new Vector2(180, 60),
                 new Color(0.8f, 0.2f, 0.2f));
             _spinButton = spinObj.GetComponent<Button>();
             _spinButton.onClick.AddListener(OnSpinClicked);
 
             _spinButtonText = spinObj.GetComponentInChildren<TextMeshProUGUI>();
-            _spinButtonText.fontSize = 36;
+            _spinButtonText.fontSize = 34;
             _spinButtonText.fontStyle = FontStyles.Bold;
 
             // 자동 스핀 버튼 - 스핀 버튼 우측에 배치
             GameObject autoSpinObj = CreateButton(betRect, "AutoSpinButton", "AUTO\nx10",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(120, 45), new Vector2(100, 65),
+                new Vector2(105, 40), new Vector2(90, 60),
                 new Color(0.3f, 0.5f, 0.7f));
             _autoSpinButton = autoSpinObj.GetComponent<Button>();
             _autoSpinButton.onClick.AddListener(OnAutoSpinClicked);
 
             _autoSpinText = autoSpinObj.GetComponentInChildren<TextMeshProUGUI>();
-            _autoSpinText.fontSize = 24;
+            _autoSpinText.fontSize = 22;
             _autoSpinText.fontStyle = FontStyles.Bold;
         }
 
@@ -400,7 +400,7 @@ namespace SlotClicker.UI
             // 결과 배너 - 슬롯 영역 하단 고정
             _resultPanel = CreatePanel(resultParent, "ResultPanel",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(0, -35), new Vector2(520, 60),
+                new Vector2(0, -30), new Vector2(480, 55),
                 new Color(0f, 0f, 0f, 0.6f));
 
             RectTransform panelRect = _resultPanel.GetComponent<RectTransform>();
@@ -420,7 +420,7 @@ namespace SlotClicker.UI
         {
             GameObject toastPanel = CreatePanel(parent, "ToastPanel",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(0, 320), new Vector2(520, 50),
+                new Vector2(0, 290), new Vector2(480, 45),
                 new Color(0f, 0f, 0f, 0.6f));
 
             _toastGroup = toastPanel.AddComponent<CanvasGroup>();
@@ -575,10 +575,10 @@ namespace SlotClicker.UI
 
         private void CreateUpgradeButton(RectTransform parent)
         {
-            // 업그레이드 버튼 (화면 오른쪽 상단, HUD 바로 아래)
+            // 업그레이드 버튼 (화면 오른쪽 상단, HUD 바로 아래 - HUD끝 -150 + 10px 간격)
             GameObject btnObj = CreateButton(parent, "UpgradeButton", "UPGRADES",
                 new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-100, -140), new Vector2(160, 50),
+                new Vector2(-90, -165), new Vector2(140, 45),
                 new Color(0.4f, 0.3f, 0.7f));
 
             _upgradeButton = btnObj.GetComponent<Button>();
@@ -616,10 +616,10 @@ namespace SlotClicker.UI
 
         private void CreatePrestigeButton(RectTransform parent)
         {
-            // 프레스티지 버튼 (화면 왼쪽 상단, HUD 바로 아래)
+            // 프레스티지 버튼 (화면 왼쪽 상단, HUD 바로 아래 - HUD끝 -150 + 10px 간격)
             GameObject btnObj = CreateButton(parent, "PrestigeButton", "PRESTIGE",
                 new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(100, -140), new Vector2(160, 50),
+                new Vector2(90, -165), new Vector2(140, 45),
                 new Color(0.6f, 0.3f, 0.6f));
 
             _prestigeButton = btnObj.GetComponent<Button>();
