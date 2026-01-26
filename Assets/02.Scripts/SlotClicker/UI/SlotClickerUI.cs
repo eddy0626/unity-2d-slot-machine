@@ -842,61 +842,46 @@ namespace SlotClicker.UI
 
         /// <summary>
         /// 커스텀 UI 스프라이트 로드 (배경, 터치 패널)
+        /// Resources/UI/ 폴더에서 자동 로드
         /// </summary>
         private void LoadCustomUISprites()
         {
             // Inspector에서 설정되지 않은 경우에만 Resources에서 로드 시도
             if (_backgroundSprite == null)
             {
-                // 다양한 경로 시도
-                Sprite[] bgSprites = Resources.LoadAll<Sprite>("Sprites/백그라운드 일러스트");
-                if (bgSprites == null || bgSprites.Length == 0)
-                {
-                    bgSprites = Resources.LoadAll<Sprite>("백그라운드 일러스트");
-                }
-                if (bgSprites == null || bgSprites.Length == 0)
-                {
-                    bgSprites = Resources.LoadAll<Sprite>("UI/백그라운드 일러스트");
-                }
+                // Resources/UI/ 폴더에서 로드 (가장 우선)
+                Sprite[] bgSprites = Resources.LoadAll<Sprite>("UI/백그라운드 일러스트");
 
                 if (bgSprites != null && bgSprites.Length > 0)
                 {
                     _backgroundSprite = bgSprites[0];
-                    Debug.Log($"[SlotClickerUI] Background sprite loaded: {_backgroundSprite.name}");
+                    Debug.Log($"[SlotClickerUI] Background sprite auto-loaded: {_backgroundSprite.name}");
                 }
             }
 
             if (_clickPanelSprite == null)
             {
-                // 터치 패널 스프라이트 로드
-                Sprite[] panelSprites = Resources.LoadAll<Sprite>("Sprites/터치영역 테이블(패널)");
-                if (panelSprites == null || panelSprites.Length == 0)
-                {
-                    panelSprites = Resources.LoadAll<Sprite>("터치영역 테이블(패널)");
-                }
-                if (panelSprites == null || panelSprites.Length == 0)
-                {
-                    panelSprites = Resources.LoadAll<Sprite>("UI/터치영역 테이블(패널)");
-                }
+                // Resources/UI/ 폴더에서 로드
+                Sprite[] panelSprites = Resources.LoadAll<Sprite>("UI/터치영역 테이블(패널)");
 
                 if (panelSprites != null && panelSprites.Length > 0)
                 {
-                    // 첫 번째 슬라이스 사용 (필요에 따라 인덱스 조정)
+                    // 첫 번째 슬라이스 사용 (_0)
                     _clickPanelSprite = panelSprites[0];
-                    Debug.Log($"[SlotClickerUI] Click panel sprite loaded: {_clickPanelSprite.name}");
+                    Debug.Log($"[SlotClickerUI] Click panel sprite auto-loaded: {_clickPanelSprite.name}");
                 }
             }
 
             // 로드 결과 로깅
             if (_backgroundSprite != null)
-                Debug.Log($"[SlotClickerUI] Custom background sprite ready: {_backgroundSprite.name} ({_backgroundSprite.rect.width}x{_backgroundSprite.rect.height})");
+                Debug.Log($"[SlotClickerUI] ✓ Background ready: {_backgroundSprite.name} ({_backgroundSprite.rect.width}x{_backgroundSprite.rect.height})");
             else
-                Debug.LogWarning("[SlotClickerUI] No custom background sprite - using default color");
+                Debug.LogWarning("[SlotClickerUI] ✗ No background sprite - using default color");
 
             if (_clickPanelSprite != null)
-                Debug.Log($"[SlotClickerUI] Custom click panel sprite ready: {_clickPanelSprite.name}");
+                Debug.Log($"[SlotClickerUI] ✓ Click panel ready: {_clickPanelSprite.name}");
             else
-                Debug.LogWarning("[SlotClickerUI] No custom click panel sprite - using default color");
+                Debug.LogWarning("[SlotClickerUI] ✗ No click panel sprite - using default color");
         }
 
         /// <summary>
