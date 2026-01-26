@@ -73,10 +73,62 @@ namespace SlotClicker.Data
         public void InitializeCache()
         {
             _upgradeLevelsCache = new Dictionary<string, int>();
-            foreach (var entry in upgradeLevelsList)
+            if (upgradeLevelsList != null)
             {
-                _upgradeLevelsCache[entry.upgradeId] = entry.level;
+                foreach (var entry in upgradeLevelsList)
+                {
+                    if (entry != null && !string.IsNullOrEmpty(entry.upgradeId))
+                    {
+                        _upgradeLevelsCache[entry.upgradeId] = Mathf.Max(0, entry.level);
+                    }
+                }
             }
+        }
+
+        /// <summary>
+        /// 세이브 데이터 검증 및 복구
+        /// </summary>
+        public void ValidateAndRepair()
+        {
+            // null 체크 및 초기화
+            if (upgradeLevelsList == null)
+                upgradeLevelsList = new List<UpgradeLevelEntry>();
+
+            if (ownedLuckyCharms == null)
+                ownedLuckyCharms = new List<string>();
+
+            // 음수 값 방지
+            gold = Math.Max(0, gold);
+            chips = Math.Max(0, chips);
+            totalGoldEarned = Math.Max(0, totalGoldEarned);
+            totalGoldLost = Math.Max(0, totalGoldLost);
+            totalClicks = Math.Max(0, totalClicks);
+            totalSpins = Math.Max(0, totalSpins);
+            jackpotCount = Math.Max(0, jackpotCount);
+            megaJackpotCount = Math.Max(0, megaJackpotCount);
+            prestigeCount = Math.Max(0, prestigeCount);
+
+            // 비정상적인 값 체크 (double overflow 방지)
+            const double MAX_GOLD = 1e30; // 1 nonillion
+            if (double.IsNaN(gold) || double.IsInfinity(gold) || gold > MAX_GOLD)
+            {
+                Debug.LogWarning($"[PlayerData] Invalid gold value detected ({gold}), resetting to safe value");
+                gold = Math.Min(gold, MAX_GOLD);
+                if (double.IsNaN(gold) || double.IsInfinity(gold))
+                    gold = 100;
+            }
+
+            if (double.IsNaN(totalGoldEarned) || double.IsInfinity(totalGoldEarned))
+                totalGoldEarned = gold;
+
+            // 버전 체크
+            if (string.IsNullOrEmpty(version))
+                version = "1.0";
+
+            // 캐시 초기화
+            InitializeCache();
+
+            Debug.Log("[PlayerData] Data validation complete");
         }
 
         public int GetUpgradeLevel(string upgradeId)

@@ -18,6 +18,10 @@ namespace SlotClicker.Core
         private float _autoCollectTimer = 0f;
         private const float AUTO_COLLECT_INTERVAL = 1f;
 
+        // 이자 처리 관련 (배칭으로 성능 최적화)
+        private float _interestTimer = 0f;
+        private const float INTEREST_INTERVAL = 0.5f;
+
         // 이벤트
         public event Action<string, int> OnUpgradePurchased; // upgradeId, newLevel
         public event Action OnUpgradesChanged;
@@ -269,13 +273,20 @@ namespace SlotClicker.Core
             float interestRate = GetEffectValue(UpgradeEffect.Interest);
             if (interestRate <= 0) return;
 
+            _interestTimer += Time.deltaTime;
+            if (_interestTimer < INTEREST_INTERVAL) return;
+
+            // 배칭: 0.5초마다 계산 (프레임별 계산 대신 성능 최적화)
+            float elapsedTime = _interestTimer;
+            _interestTimer = 0f;
+
             // 럭키참 보너스 적용
             float charmBonus = _gameManager.Prestige?.GetInterestMultiplier() ?? 1f;
             float adjustedRate = interestRate * charmBonus;
 
-            // 이자는 프레임당 계산 (초당 비율을 프레임으로 나눔)
+            // 이자 계산 (배칭된 시간 적용)
             double currentGold = _gameManager.Gold.CurrentGold;
-            double interest = currentGold * (adjustedRate / 100f) * Time.deltaTime;
+            double interest = currentGold * (adjustedRate / 100f) * elapsedTime;
 
             if (interest > 0.01) // 최소 이자
             {

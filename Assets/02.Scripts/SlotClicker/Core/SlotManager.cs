@@ -34,6 +34,7 @@ namespace SlotClicker.Core
 
         // 상태
         private bool _isSpinning = false;
+        private readonly object _spinLock = new object();
         public bool IsSpinning => _isSpinning;
 
         // 연패 추적
@@ -59,32 +60,41 @@ namespace SlotClicker.Core
         /// </summary>
         public bool TrySpin(double betAmount)
         {
-            if (_isSpinning)
+            // Race condition 방지: 락을 사용하여 동시 호출 차단
+            lock (_spinLock)
             {
-                Debug.LogWarning("[SlotManager] Already spinning!");
-                return false;
+                if (_isSpinning)
+                {
+                    Debug.LogWarning("[SlotManager] Already spinning!");
+                    return false;
+                }
+                // 락 내에서 즉시 플래그 설정하여 이중 호출 방지
+                _isSpinning = true;
             }
 
+            // 유효성 검사 (실패 시 플래그 복원)
             if (betAmount <= 0)
             {
                 Debug.LogWarning("[SlotManager] Invalid bet amount!");
+                _isSpinning = false;
                 return false;
             }
 
             if (!_gameManager.Gold.CanAfford(betAmount))
             {
                 Debug.LogWarning("[SlotManager] Not enough gold!");
+                _isSpinning = false;
                 return false;
             }
 
             // 베팅액 차감
             if (!_gameManager.Gold.SpendGold(betAmount))
             {
+                _isSpinning = false;
                 return false;
             }
 
             _playerData.totalSpins++;
-            _isSpinning = true;
             OnSpinStart?.Invoke();
 
             // 결과 계산

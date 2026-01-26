@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -91,8 +92,12 @@ namespace SlotClicker.UI
         private TextMeshProUGUI _autoSpinText;
         private readonly int[] _autoSpinOptions = { 10, 25, 50, 100 };
 
-        // 클릭 이펙트 풀
+        // 클릭 이펙트 풀 (오브젝트 풀링으로 성능 최적화)
         private GameObject _floatingTextPrefab;
+        private Queue<GameObject> _floatingTextPool = new Queue<GameObject>();
+        private List<GameObject> _activeFloatingTexts = new List<GameObject>();
+        private const int POOL_INITIAL_SIZE = 10;
+        private const int POOL_MAX_SIZE = 30;
 
         // 슬롯 스핀 관련
         private Coroutine[] _spinCoroutines = new Coroutine[3];
@@ -589,6 +594,101 @@ namespace SlotClicker.UI
             tmp.color = Color.yellow;
 
             _floatingTextPrefab.transform.SetParent(_mainCanvas.transform, false);
+
+            // 오브젝트 풀 초기화
+            InitializeFloatingTextPool();
+        }
+
+        /// <summary>
+        /// 플로팅 텍스트 오브젝트 풀 초기화
+        /// </summary>
+        private void InitializeFloatingTextPool()
+        {
+            for (int i = 0; i < POOL_INITIAL_SIZE; i++)
+            {
+                GameObject pooledObj = CreatePooledFloatingText();
+                _floatingTextPool.Enqueue(pooledObj);
+            }
+        }
+
+        private GameObject CreatePooledFloatingText()
+        {
+            GameObject obj = Instantiate(_floatingTextPrefab, _mainCanvas.transform);
+            obj.name = "PooledFloatingText";
+            obj.SetActive(false);
+            return obj;
+        }
+
+        /// <summary>
+        /// 풀에서 플로팅 텍스트 가져오기
+        /// </summary>
+        private GameObject GetFloatingTextFromPool()
+        {
+            GameObject obj;
+            if (_floatingTextPool.Count > 0)
+            {
+                obj = _floatingTextPool.Dequeue();
+            }
+            else if (_activeFloatingTexts.Count < POOL_MAX_SIZE)
+            {
+                obj = CreatePooledFloatingText();
+            }
+            else
+            {
+                // 풀이 가득 찼으면 가장 오래된 활성 텍스트 재활용
+                obj = _activeFloatingTexts[0];
+                _activeFloatingTexts.RemoveAt(0);
+                obj.transform.DOKill();
+            }
+
+            _activeFloatingTexts.Add(obj);
+            return obj;
+        }
+
+        /// <summary>
+        /// 플로팅 텍스트를 풀에 반환
+        /// </summary>
+        private void ReturnFloatingTextToPool(GameObject obj)
+        {
+            if (obj == null) return;
+
+            obj.transform.DOKill();
+            obj.SetActive(false);
+            _activeFloatingTexts.Remove(obj);
+
+            if (_floatingTextPool.Count < POOL_MAX_SIZE)
+            {
+                _floatingTextPool.Enqueue(obj);
+            }
+            else
+            {
+                Destroy(obj);
+            }
+        }
+
+        /// <summary>
+        /// 플로팅 텍스트 풀 정리
+        /// </summary>
+        private void CleanupFloatingTextPool()
+        {
+            foreach (var obj in _activeFloatingTexts)
+            {
+                if (obj != null)
+                {
+                    obj.transform.DOKill();
+                    Destroy(obj);
+                }
+            }
+            _activeFloatingTexts.Clear();
+
+            while (_floatingTextPool.Count > 0)
+            {
+                var obj = _floatingTextPool.Dequeue();
+                if (obj != null) Destroy(obj);
+            }
+
+            if (_floatingTextPrefab != null)
+                Destroy(_floatingTextPrefab);
         }
 
         #region Helper Methods
@@ -820,13 +920,50 @@ namespace SlotClicker.UI
 
         private void OnDestroy()
         {
-            if (_game != null && _game.Gold != null)
+            // DOTween 정리 - 모든 활성 트윈 중지
+            _goldCountTween?.Kill();
+            _resultTween?.Kill();
+            _toastTween?.Kill();
+
+            // 무한 루프 DOTween 애니메이션 정리
+            if (_upgradeButton != null) _upgradeButton.transform.DOKill();
+            if (_prestigeButton != null) _prestigeButton.transform.DOKill();
+            if (_clickArea != null)
             {
-                _game.Gold.OnGoldChanged -= OnGoldChanged;
-                _game.Click.OnClick -= OnClickResult;
-                _game.Slot.OnSpinStart -= OnSlotSpinStart;
-                _game.Slot.OnSpinComplete -= OnSlotSpinComplete;
-                _game.Slot.OnReelStop -= OnReelStop;
+                var tableText = _clickArea.GetComponentInChildren<TextMeshProUGUI>();
+                if (tableText != null) tableText.transform.DOKill();
+            }
+
+            // 릴 애니메이션 정리
+            for (int i = 0; i < _reelSymbols.Length; i++)
+            {
+                if (_reelSymbols[i] != null)
+                {
+                    _reelSymbols[i].transform.DOKill();
+                    _reelSymbols[i].DOKill();
+                }
+                if (_reelFrames[i] != null) _reelFrames[i].DOKill();
+            }
+
+            // 스핀 상태 텍스트 정리
+            if (_spinStateText != null) _spinStateText.transform.DOKill();
+
+            // 플로팅 텍스트 풀 정리
+            CleanupFloatingTextPool();
+
+            // 이벤트 구독 해제 (null-safe)
+            if (_game != null)
+            {
+                if (_game.Gold != null)
+                    _game.Gold.OnGoldChanged -= OnGoldChanged;
+                if (_game.Click != null)
+                    _game.Click.OnClick -= OnClickResult;
+                if (_game.Slot != null)
+                {
+                    _game.Slot.OnSpinStart -= OnSlotSpinStart;
+                    _game.Slot.OnSpinComplete -= OnSlotSpinComplete;
+                    _game.Slot.OnReelStop -= OnReelStop;
+                }
             }
         }
 
@@ -1019,22 +1156,25 @@ namespace SlotClicker.UI
 
         private void SpawnFloatingText(Vector2 position, double amount, bool isCritical)
         {
-            GameObject floatText = Instantiate(_floatingTextPrefab, _mainCanvas.transform);
+            // 오브젝트 풀에서 가져오기 (Instantiate 대신)
+            GameObject floatText = GetFloatingTextFromPool();
             floatText.SetActive(true);
 
             RectTransform rect = floatText.GetComponent<RectTransform>();
             rect.anchoredPosition = position;
+            rect.localScale = Vector3.one;
 
             TextMeshProUGUI tmp = floatText.GetComponent<TextMeshProUGUI>();
             tmp.text = $"+{GoldManager.FormatNumber(amount)}";
             tmp.color = isCritical ? _criticalColor : Color.yellow;
             tmp.fontSize = isCritical ? 52 : 40;
+            tmp.alpha = 1f; // 알파 초기화 (풀에서 재사용 시 필요)
 
-            // 애니메이션
+            // 애니메이션 (완료 시 풀에 반환)
             Sequence seq = DOTween.Sequence();
             seq.Append(rect.DOAnchorPosY(rect.anchoredPosition.y + 100, 0.8f).SetEase(Ease.OutQuad));
             seq.Join(tmp.DOFade(0, 0.8f).SetEase(Ease.InQuad));
-            seq.OnComplete(() => Destroy(floatText));
+            seq.OnComplete(() => ReturnFloatingTextToPool(floatText));
         }
 
         private Vector2 GetPointerScreenPosition()
