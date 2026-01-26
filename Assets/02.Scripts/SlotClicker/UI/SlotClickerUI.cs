@@ -51,6 +51,13 @@ namespace SlotClicker.UI
         [Header("=== 심볼 스프라이트 ===")]
         [SerializeField] private Sprite[] _symbolSprites;
 
+        [Header("=== 커스텀 UI 스프라이트 ===")]
+        [Tooltip("배경 이미지 스프라이트 (Assets/04.Images/백그라운드 일러스트에서 드래그)")]
+        [SerializeField] private Sprite _backgroundSprite;
+        [Tooltip("터치 영역 패널 스프라이트 (Assets/04.Images/터치영역 테이블(패널)에서 드래그)")]
+        [SerializeField] private Sprite _clickPanelSprite;
+        private Image _backgroundImage;
+
         [Header("=== 색상 설정 ===")]
         [SerializeField] private Color _normalClickColor = new Color(0.2f, 0.6f, 0.2f);
         [SerializeField] private Color _criticalColor = new Color(1f, 0.8f, 0f);
@@ -173,6 +180,10 @@ namespace SlotClicker.UI
 
             // 스프라이트 로드
             LoadSymbolSprites();
+            LoadCustomUISprites();
+
+            // 기존 클릭 영역에 커스텀 스프라이트 적용
+            ApplyCustomSpritesToExistingUI();
 
             // 슬롯 영역 설정
             if (_slotPanel != null)
@@ -291,6 +302,7 @@ namespace SlotClicker.UI
 
             // 스프라이트 로드
             LoadSymbolSprites();
+            LoadCustomUISprites();
 
             // 캔버스 생성
             if (_mainCanvas == null)
@@ -307,7 +319,10 @@ namespace SlotClicker.UI
 
             RectTransform canvasRect = _mainCanvas.GetComponent<RectTransform>();
 
-            // === 클릭 영역 (먼저 생성 - 뒤에 렌더링) ===
+            // === 배경 이미지 (가장 먼저 생성 - 가장 뒤에 렌더링) ===
+            CreateBackground(canvasRect);
+
+            // === 클릭 영역 (배경 다음에 생성) ===
             CreateClickArea(canvasRect);
 
             // === 하단 베팅 UI ===
@@ -461,7 +476,24 @@ namespace SlotClicker.UI
                 new Vector2(0, -80), new Vector2(520, 200), new Color(0.1f, 0.4f, 0.15f, 1f));
             RectTransform clickRect = clickPanel.GetComponent<RectTransform>();
 
-            AddOutline(clickPanel, new Color(0.6f, 0.4f, 0.1f), 5);
+            // 커스텀 스프라이트 적용
+            Image clickImage = clickPanel.GetComponent<Image>();
+            if (_clickPanelSprite != null)
+            {
+                clickImage.sprite = _clickPanelSprite;
+                clickImage.type = Image.Type.Sliced; // 9-slice 지원
+                clickImage.color = Color.white;
+                // 커스텀 스프라이트 크기에 맞게 조정 (비율 유지)
+                float aspectRatio = _clickPanelSprite.rect.width / _clickPanelSprite.rect.height;
+                float newWidth = clickRect.sizeDelta.y * aspectRatio;
+                clickRect.sizeDelta = new Vector2(Mathf.Max(newWidth, 520), clickRect.sizeDelta.y);
+                Debug.Log("[SlotClickerUI] Custom click panel sprite applied");
+            }
+            else
+            {
+                // 기본 스타일: 아웃라인 추가
+                AddOutline(clickPanel, new Color(0.6f, 0.4f, 0.1f), 5);
+            }
 
             // 버튼 컴포넌트
             _clickArea = clickPanel.AddComponent<Button>();
@@ -804,6 +836,139 @@ namespace SlotClicker.UI
                 for (int i = 0; i < Mathf.Min(3, _symbolSprites.Length); i++)
                 {
                     Debug.Log($"  - Sprite {i}: {_symbolSprites[i].name}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 커스텀 UI 스프라이트 로드 (배경, 터치 패널)
+        /// </summary>
+        private void LoadCustomUISprites()
+        {
+            // Inspector에서 설정되지 않은 경우에만 Resources에서 로드 시도
+            if (_backgroundSprite == null)
+            {
+                // 다양한 경로 시도
+                Sprite[] bgSprites = Resources.LoadAll<Sprite>("Sprites/백그라운드 일러스트");
+                if (bgSprites == null || bgSprites.Length == 0)
+                {
+                    bgSprites = Resources.LoadAll<Sprite>("백그라운드 일러스트");
+                }
+                if (bgSprites == null || bgSprites.Length == 0)
+                {
+                    bgSprites = Resources.LoadAll<Sprite>("UI/백그라운드 일러스트");
+                }
+
+                if (bgSprites != null && bgSprites.Length > 0)
+                {
+                    _backgroundSprite = bgSprites[0];
+                    Debug.Log($"[SlotClickerUI] Background sprite loaded: {_backgroundSprite.name}");
+                }
+            }
+
+            if (_clickPanelSprite == null)
+            {
+                // 터치 패널 스프라이트 로드
+                Sprite[] panelSprites = Resources.LoadAll<Sprite>("Sprites/터치영역 테이블(패널)");
+                if (panelSprites == null || panelSprites.Length == 0)
+                {
+                    panelSprites = Resources.LoadAll<Sprite>("터치영역 테이블(패널)");
+                }
+                if (panelSprites == null || panelSprites.Length == 0)
+                {
+                    panelSprites = Resources.LoadAll<Sprite>("UI/터치영역 테이블(패널)");
+                }
+
+                if (panelSprites != null && panelSprites.Length > 0)
+                {
+                    // 첫 번째 슬라이스 사용 (필요에 따라 인덱스 조정)
+                    _clickPanelSprite = panelSprites[0];
+                    Debug.Log($"[SlotClickerUI] Click panel sprite loaded: {_clickPanelSprite.name}");
+                }
+            }
+
+            // 로드 결과 로깅
+            if (_backgroundSprite != null)
+                Debug.Log($"[SlotClickerUI] Custom background sprite ready: {_backgroundSprite.name} ({_backgroundSprite.rect.width}x{_backgroundSprite.rect.height})");
+            else
+                Debug.LogWarning("[SlotClickerUI] No custom background sprite - using default color");
+
+            if (_clickPanelSprite != null)
+                Debug.Log($"[SlotClickerUI] Custom click panel sprite ready: {_clickPanelSprite.name}");
+            else
+                Debug.LogWarning("[SlotClickerUI] No custom click panel sprite - using default color");
+        }
+
+        /// <summary>
+        /// 배경 이미지 생성
+        /// </summary>
+        private void CreateBackground(RectTransform parent)
+        {
+            GameObject bgObj = new GameObject("Background");
+            bgObj.transform.SetParent(parent, false);
+            bgObj.transform.SetAsFirstSibling(); // 가장 뒤에 렌더링되도록
+
+            RectTransform rect = bgObj.AddComponent<RectTransform>();
+            // 전체 화면 채우기
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            _backgroundImage = bgObj.AddComponent<Image>();
+
+            if (_backgroundSprite != null)
+            {
+                _backgroundImage.sprite = _backgroundSprite;
+                _backgroundImage.type = Image.Type.Sliced; // 9-slice 지원
+                _backgroundImage.preserveAspect = false;
+                _backgroundImage.color = Color.white;
+                Debug.Log("[SlotClickerUI] Custom background applied");
+            }
+            else
+            {
+                // 기본 그라디언트 배경색 (커스텀 스프라이트 없을 때)
+                _backgroundImage.color = new Color(0.08f, 0.06f, 0.12f, 1f);
+            }
+
+            // 배경은 클릭 이벤트 받지 않음
+            _backgroundImage.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// 기존 UI에 커스텀 스프라이트 적용 (SetupExistingUI용)
+        /// </summary>
+        private void ApplyCustomSpritesToExistingUI()
+        {
+            // 배경 이미지 찾기 또는 생성
+            Transform bgTransform = _mainCanvas.transform.Find("Background");
+            if (bgTransform == null && _backgroundSprite != null)
+            {
+                // 배경이 없으면 생성
+                CreateBackground(_mainCanvas.GetComponent<RectTransform>());
+            }
+            else if (bgTransform != null && _backgroundSprite != null)
+            {
+                // 기존 배경에 스프라이트 적용
+                _backgroundImage = bgTransform.GetComponent<Image>();
+                if (_backgroundImage != null)
+                {
+                    _backgroundImage.sprite = _backgroundSprite;
+                    _backgroundImage.type = Image.Type.Sliced;
+                    _backgroundImage.color = Color.white;
+                }
+            }
+
+            // 클릭 영역에 스프라이트 적용
+            if (_clickArea != null && _clickPanelSprite != null)
+            {
+                Image clickImage = _clickArea.GetComponent<Image>();
+                if (clickImage != null)
+                {
+                    clickImage.sprite = _clickPanelSprite;
+                    clickImage.type = Image.Type.Sliced;
+                    clickImage.color = Color.white;
+                    Debug.Log("[SlotClickerUI] Custom click panel sprite applied to existing UI");
                 }
             }
         }
