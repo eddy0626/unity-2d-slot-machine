@@ -1,0 +1,55 @@
+﻿# Unity 프로젝트 EditorConfig
+# 한글 주석 지원을 위한 UTF-8 인코딩 설정
+
+root = true
+
+# 모든 파일 기본 설정
+[*]
+charset = utf-8-bom
+end_of_line = crlf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C# 스크립트 설정
+[*.cs]
+charset = utf-8-bom
+indent_style = space
+indent_size = 4
+
+# C# 코딩 스타일
+dotnet_sort_system_directives_first = true
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+
+# Unity 메타 파일
+[*.meta]
+indent_style = space
+indent_size = 2
+
+# JSON 파일
+[*.json]
+indent_style = space
+indent_size = 2
+
+# YAML 파일
+[*.{yaml,yml}]
+indent_style = space
+indent_size = 2
+
+# XML 파일
+[*.xml]
+indent_style = space
+indent_size = 2
+
+# Shader 파일
+[*.{shader,cginc,hlsl}]
+indent_style = space
+indent_size = 4
