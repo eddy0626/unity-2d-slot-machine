@@ -14,6 +14,14 @@ namespace SlotClicker.Core
         [SerializeField] private GameConfig _config;
         [SerializeField] private bool _createUIOnStart = true;
 
+        [Header("=== 화면 회전 설정 ===")]
+        [Tooltip("화면 회전 관리자 자동 생성")]
+        [SerializeField] private bool _enableOrientationManager = true;
+        [Tooltip("자동 회전 기본값")]
+        [SerializeField] private bool _autoRotationDefault = true;
+        [Tooltip("반응형 UI 자동 설정")]
+        [SerializeField] private bool _enableResponsiveUI = true;
+
         [Header("=== 디버그 ===")]
         [SerializeField] private bool _debugMode = false;
         [SerializeField] private double _debugStartGold = 1000;
@@ -31,6 +39,12 @@ namespace SlotClicker.Core
                 {
                     gameManager.SetConfig(_config);
                 }
+            }
+
+            // OrientationManager 생성
+            if (_enableOrientationManager && OrientationManager.Instance == null)
+            {
+                CreateOrientationManager();
             }
         }
 
@@ -66,9 +80,18 @@ namespace SlotClicker.Core
         private void CreateUI()
         {
             // 이미 UI가 있는지 확인
-            if (FindObjectOfType<SlotClickerUI>() != null)
+            SlotClickerUI existingUI = FindObjectOfType<SlotClickerUI>();
+            if (existingUI != null)
             {
                 Debug.Log("[SlotClickerInitializer] UI already exists.");
+
+                // 반응형 UI 컴포넌트 추가 (기존 UI에)
+                if (_enableResponsiveUI && existingUI.GetComponent<SlotClickerResponsiveUI>() == null)
+                {
+                    SlotClickerResponsiveUI responsiveUI = existingUI.gameObject.AddComponent<SlotClickerResponsiveUI>();
+                    responsiveUI.AutoFindUIReferences();
+                    Debug.Log("[SlotClickerInitializer] Responsive UI added to existing UI.");
+                }
                 return;
             }
 
@@ -76,7 +99,32 @@ namespace SlotClicker.Core
             GameObject uiObj = new GameObject("SlotClickerUI");
             uiObj.AddComponent<SlotClickerUI>();
 
+            // 반응형 UI 컴포넌트 추가
+            if (_enableResponsiveUI)
+            {
+                SlotClickerResponsiveUI responsiveUI = uiObj.AddComponent<SlotClickerResponsiveUI>();
+                // UI 생성 후 참조 찾기 (Start에서 처리됨)
+                Debug.Log("[SlotClickerInitializer] Responsive UI component added.");
+            }
+
             Debug.Log("[SlotClickerInitializer] UI created.");
+        }
+
+        /// <summary>
+        /// OrientationManager 생성 및 초기화
+        /// </summary>
+        private void CreateOrientationManager()
+        {
+            GameObject orientationObj = new GameObject("OrientationManager");
+            OrientationManager orientationManager = orientationObj.AddComponent<OrientationManager>();
+
+            // 기본 설정 적용
+            orientationManager.AutoRotationEnabled = _autoRotationDefault;
+
+            // 저장된 설정 로드
+            orientationManager.LoadSettings();
+
+            Debug.Log("[SlotClickerInitializer] OrientationManager created.");
         }
 
         /// <summary>

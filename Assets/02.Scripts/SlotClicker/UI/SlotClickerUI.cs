@@ -33,6 +33,16 @@ namespace SlotClicker.UI
         [SerializeField] private Image[] _reelFramesRef;
         [SerializeField] private TextMeshProUGUI _spinStateText;
 
+        [Header("=== 3x3 슬롯 그리드 설정 ===")]
+        [SerializeField] private Vector2 _slotPanelSize = new Vector2(480, 480);
+        [SerializeField] private float _slotCellSize = 130f;
+        [SerializeField] private float _slotCellSpacing = 145f;
+        [SerializeField] private Vector2 _slotPanelPosition = new Vector2(0, -475);
+
+        [Header("=== 클릭 영역 설정 ===")]
+        [SerializeField] private Vector2 _clickAreaSize = new Vector2(420, 150);
+        [SerializeField] private Vector2 _clickAreaPosition = new Vector2(0, -280);
+
         [Header("=== 베팅 UI ===")]
         [SerializeField] private Button[] _betButtons;
         [SerializeField] private TextMeshProUGUI _betAmountText;
@@ -57,6 +67,15 @@ namespace SlotClicker.UI
         [Tooltip("터치 영역 패널 스프라이트 (Assets/04.Images/터치영역 테이블(패널)에서 드래그)")]
         [SerializeField] private Sprite _clickPanelSprite;
         private Image _backgroundImage;
+
+        // 버튼 스프라이트들 (배팅_스핀버튼 스프라이트 시트에서 로드)
+        private Sprite[] _allButtonSprites;
+        private Sprite _bet10Sprite;      // 10% 버튼
+        private Sprite _bet30Sprite;      // 30% 버튼
+        private Sprite _bet50Sprite;      // 50% 버튼
+        private Sprite _betAllSprite;     // ALL 버튼
+        private Sprite _spinSprite;       // SPIN 버튼
+        private Sprite _autoSpinSprite;   // AUTO 버튼
 
         [Header("=== 색상 설정 ===")]
         [SerializeField] private Color _normalClickColor = new Color(0.2f, 0.6f, 0.2f);
@@ -106,10 +125,10 @@ namespace SlotClicker.UI
         private const int POOL_INITIAL_SIZE = 10;
         private const int POOL_MAX_SIZE = 30;
 
-        // 슬롯 스핀 관련
-        private Coroutine[] _spinCoroutines = new Coroutine[3];
-        private bool[] _isReelSpinning = new bool[3];
-        private Image[] _reelFrames = new Image[3];
+        // 슬롯 스핀 관련 (3x3 = 9개)
+        private Coroutine[] _spinCoroutines = new Coroutine[9];
+        private bool[] _isReelSpinning = new bool[9];
+        private Image[] _reelFrames = new Image[9];
         private readonly Color _reelFrameBaseColor = new Color(0.2f, 0.15f, 0.25f, 1f);
         private Tween _resultTween;
         private Tween _toastTween;
@@ -185,28 +204,14 @@ namespace SlotClicker.UI
             // 기존 클릭 영역에 커스텀 스프라이트 적용
             ApplyCustomSpritesToExistingUI();
 
-            // 슬롯 영역 설정
-            if (_slotPanel != null)
-            {
-                _slotAreaRect = _slotPanel;
-            }
+            // 클릭 영역 위치/크기 적용
+            ApplyClickAreaSettings();
 
-            // 릴 프레임 참조 설정
-            if (_reelFramesRef != null && _reelFramesRef.Length > 0)
-            {
-                _reelFrames = _reelFramesRef;
-            }
-            else if (_reelSymbols != null)
-            {
-                // 심볼의 부모에서 프레임 이미지 찾기
-                for (int i = 0; i < _reelSymbols.Length && i < _reelFrames.Length; i++)
-                {
-                    if (_reelSymbols[i] != null && _reelSymbols[i].transform.parent != null)
-                    {
-                        _reelFrames[i] = _reelSymbols[i].transform.parent.GetComponent<Image>();
-                    }
-                }
-            }
+            // 버튼 스프라이트 적용
+            ApplyButtonSprites();
+
+            // 슬롯 영역: 기존 슬롯 패널을 3x3 그리드로 재생성
+            Recreate3x3SlotGrid();
 
             // 자동 스핀 버튼 설정
             if (_autoSpinButtonRef != null)
@@ -408,9 +413,9 @@ namespace SlotClicker.UI
 
         private void CreateSlotArea(RectTransform parent)
         {
-            // 슬롯 패널 - 상단 HUD 아래에 배치 (HUD 끝 -150 + 30px 간격 = -180)
+            // 슬롯 패널 - 3x3 그리드용 확장된 크기
             GameObject slotPanel = CreatePanel(parent, "SlotPanel", new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, -180), new Vector2(520, 160), new Color(0.15f, 0.1f, 0.2f, 1f));
+                _slotPanelPosition, _slotPanelSize, new Color(0.15f, 0.1f, 0.2f, 1f));
             RectTransform slotRect = slotPanel.GetComponent<RectTransform>();
             _slotAreaRect = slotRect;
 
@@ -418,62 +423,307 @@ namespace SlotClicker.UI
             Image frameImg = slotPanel.GetComponent<Image>();
             AddOutline(slotPanel, new Color(0.8f, 0.6f, 0.2f), 4);
 
-            // 스핀 상태 텍스트
+            // 스핀 상태 텍스트 (상단에 배치)
             GameObject stateObj = CreateTextObject(slotRect, "SpinStateText", "READY",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -10), 28);
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, 30), 28);
             _spinStateText = stateObj.GetComponent<TextMeshProUGUI>();
             _spinStateText.color = new Color(0.8f, 0.8f, 0.9f);
             _spinStateText.alignment = TextAlignmentOptions.Center;
 
-            // 릴 심볼들
-            _reelSymbols = new Image[3];
-            float spacing = 150f;  // 슬롯 패널 크기에 맞게 조정
-            float startX = -spacing;
+            // 3x3 그리드 심볼들 (9개)
+            _reelSymbols = new Image[9];
+            float cellSize = _slotCellSize;
+            float spacing = _slotCellSpacing;
+            float gridOffset = spacing; // 그리드 중앙 정렬용
 
-            for (int i = 0; i < 3; i++)
+            // 그리드 인덱스: 0 1 2 (상단) / 3 4 5 (중간) / 6 7 8 (하단)
+            for (int row = 0; row < 3; row++)
             {
-                GameObject reelBg = CreatePanel(slotRect, $"ReelBg_{i}",
-                    new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                    new Vector2(startX + (i * spacing), 0), new Vector2(110, 110),
-                    _reelFrameBaseColor);
-
-                // RectMask2D 사용 (Mask보다 간단하고 스프라이트 불필요)
-                reelBg.AddComponent<RectMask2D>();
-                _reelFrames[i] = reelBg.GetComponent<Image>();
-
-                GameObject symbolObj = new GameObject($"Symbol_{i}");
-                symbolObj.transform.SetParent(reelBg.transform, false);
-                RectTransform symRect = symbolObj.AddComponent<RectTransform>();
-                symRect.anchorMin = Vector2.zero;
-                symRect.anchorMax = Vector2.one;
-                symRect.offsetMin = new Vector2(5, 5);
-                symRect.offsetMax = new Vector2(-5, -5);
-
-                _reelSymbols[i] = symbolObj.AddComponent<Image>();
-                _reelSymbols[i].preserveAspect = true;
-                _reelSymbols[i].raycastTarget = false; // 클릭 방해 방지
-
-                // 초기 스프라이트 설정
-                Sprite sprite = GetSymbolSprite(i);
-                if (sprite != null)
+                for (int col = 0; col < 3; col++)
                 {
-                    _reelSymbols[i].sprite = sprite;
-                    _reelSymbols[i].color = Color.white;
-                    Debug.Log($"[SlotClickerUI] Reel {i} sprite set: {sprite.name}");
-                }
-                else
-                {
-                    _reelSymbols[i].color = GetSymbolColor(i);
-                    Debug.LogWarning($"[SlotClickerUI] Reel {i} using fallback color (no sprite)");
+                    int idx = row * 3 + col;
+
+                    // 위치 계산 (중앙 기준)
+                    float x = (col - 1) * spacing;
+                    float y = (1 - row) * spacing; // row 0이 상단
+
+                    GameObject reelBg = CreatePanel(slotRect, $"ReelBg_{idx}",
+                        new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                        new Vector2(x, y), new Vector2(cellSize, cellSize),
+                        _reelFrameBaseColor);
+
+                    reelBg.AddComponent<RectMask2D>();
+                    _reelFrames[idx] = reelBg.GetComponent<Image>();
+
+                    GameObject symbolObj = new GameObject($"Symbol_{idx}");
+                    symbolObj.transform.SetParent(reelBg.transform, false);
+                    RectTransform symRect = symbolObj.AddComponent<RectTransform>();
+                    symRect.anchorMin = Vector2.zero;
+                    symRect.anchorMax = Vector2.one;
+                    symRect.offsetMin = new Vector2(5, 5);
+                    symRect.offsetMax = new Vector2(-5, -5);
+
+                    _reelSymbols[idx] = symbolObj.AddComponent<Image>();
+                    _reelSymbols[idx].preserveAspect = true;
+                    _reelSymbols[idx].raycastTarget = false;
+
+                    // 초기 스프라이트 설정
+                    Sprite sprite = GetSymbolSprite(idx);
+                    if (sprite != null)
+                    {
+                        _reelSymbols[idx].sprite = sprite;
+                        _reelSymbols[idx].color = Color.white;
+                    }
+                    else
+                    {
+                        _reelSymbols[idx].color = GetSymbolColor(idx);
+                    }
                 }
             }
+
+            // 페이라인 표시용 라인 (선택적 - 시각적 가이드)
+            CreatePaylineIndicators(slotRect);
+
+            Debug.Log("[SlotClickerUI] 3x3 Slot grid created successfully!");
+        }
+
+        /// <summary>
+        /// 페이라인 시각적 표시 생성 (당첨 시 하이라이트용)
+        /// </summary>
+        private void CreatePaylineIndicators(RectTransform parent)
+        {
+            // 페이라인 표시는 당첨 시에만 동적으로 표시
+            // 여기서는 배경 패턴만 추가 (선택적)
+        }
+
+        /// <summary>
+        /// 클릭 영역 위치/크기 설정 적용 (SetupExistingUI용)
+        /// </summary>
+        private void ApplyClickAreaSettings()
+        {
+            if (_clickArea == null) return;
+
+            RectTransform clickRect = _clickArea.GetComponent<RectTransform>();
+            if (clickRect != null)
+            {
+                clickRect.anchoredPosition = _clickAreaPosition;
+                clickRect.sizeDelta = _clickAreaSize;
+                Debug.Log($"[SlotClickerUI] Click area updated - Position: {_clickAreaPosition}, Size: {_clickAreaSize}");
+            }
+        }
+
+        /// <summary>
+        /// 스프라이트 시트에서 인덱스로 스프라이트 가져오기
+        /// </summary>
+        private Sprite GetSpriteByIndex(int index)
+        {
+            if (_allButtonSprites == null || _allButtonSprites.Length == 0)
+                return null;
+
+            // 스프라이트 이름으로 찾기 (배팅_스핀버튼_N 형식)
+            string targetName = $"배팅_스핀버튼_{index}";
+            foreach (var sprite in _allButtonSprites)
+            {
+                if (sprite.name == targetName)
+                    return sprite;
+            }
+
+            // 이름으로 못 찾으면 인덱스로 시도
+            if (index >= 0 && index < _allButtonSprites.Length)
+                return _allButtonSprites[index];
+
+            return null;
+        }
+
+        /// <summary>
+        /// 버튼 스프라이트 적용 (베팅/스핀/오토 버튼)
+        /// </summary>
+        private void ApplyButtonSprites()
+        {
+            bool hasAnySprite = _allButtonSprites != null && _allButtonSprites.Length > 0;
+            if (!hasAnySprite) return;
+
+            // 베팅 버튼들에 각각 다른 스프라이트 적용
+            if (_betButtons != null)
+            {
+                Sprite[] betSprites = { _bet10Sprite, _bet30Sprite, _bet50Sprite, _betAllSprite };
+                for (int i = 0; i < _betButtons.Length && i < betSprites.Length; i++)
+                {
+                    if (_betButtons[i] != null && betSprites[i] != null)
+                    {
+                        ApplySpriteToButton(_betButtons[i].gameObject, betSprites[i]);
+                    }
+                }
+            }
+
+            // 스핀 버튼에 스프라이트 적용
+            if (_spinButton != null && _spinSprite != null)
+            {
+                ApplySpriteToButton(_spinButton.gameObject, _spinSprite);
+            }
+
+            // 오토 스핀 버튼에 스프라이트 적용
+            Button autoBtn = _autoSpinButton ?? _autoSpinButtonRef;
+            if (autoBtn != null && _autoSpinSprite != null)
+            {
+                ApplySpriteToButton(autoBtn.gameObject, _autoSpinSprite);
+            }
+
+            Debug.Log("[SlotClickerUI] Button sprites applied with individual sprites");
+        }
+
+        /// <summary>
+        /// 개별 버튼에 스프라이트 적용 (기존 배경 완전 제거)
+        /// </summary>
+        private void ApplySpriteToButton(GameObject buttonObj, Sprite sprite)
+        {
+            if (buttonObj == null || sprite == null) return;
+
+            // 메인 버튼 이미지에 스프라이트 적용
+            Image mainImg = buttonObj.GetComponent<Image>();
+            if (mainImg != null)
+            {
+                // 기존 배경색 제거하고 스프라이트만 표시
+                mainImg.sprite = sprite;
+                mainImg.type = Image.Type.Simple;
+                mainImg.preserveAspect = true;
+                mainImg.color = Color.white; // 스프라이트 원본 색상 유지
+
+                // 버튼 색상 트랜지션 - 모두 흰색으로 (스프라이트 색상 유지)
+                Button btn = buttonObj.GetComponent<Button>();
+                if (btn != null)
+                {
+                    // 트랜지션을 None으로 설정하여 색상 변화 방지
+                    btn.transition = Selectable.Transition.None;
+                }
+            }
+
+            // 자식 Label의 텍스트만 유지하고, 텍스트 위치/스타일 조정
+            for (int i = buttonObj.transform.childCount - 1; i >= 0; i--)
+            {
+                Transform child = buttonObj.transform.GetChild(i);
+
+                // 텍스트 컴포넌트 확인
+                TextMeshProUGUI tmpText = child.GetComponent<TextMeshProUGUI>();
+                UnityEngine.UI.Text legacyText = child.GetComponent<UnityEngine.UI.Text>();
+
+                if (tmpText != null || legacyText != null)
+                {
+                    // 텍스트는 유지하되, 배경 이미지가 있으면 제거
+                    Image textBgImg = child.GetComponent<Image>();
+                    if (textBgImg != null)
+                    {
+                        textBgImg.enabled = false;
+                    }
+                    continue;
+                }
+
+                // 텍스트가 아닌 자식은 모두 비활성화 (배경 이미지 등)
+                child.gameObject.SetActive(false);
+                Debug.Log($"[SlotClickerUI] Disabled child '{child.name}' in button '{buttonObj.name}'");
+            }
+
+            Debug.Log($"[SlotClickerUI] Applied sprite '{sprite.name}' to button '{buttonObj.name}'");
+        }
+
+        /// <summary>
+        /// 기존 슬롯 패널을 3x3 그리드로 재생성 (SetupExistingUI용)
+        /// </summary>
+        private void Recreate3x3SlotGrid()
+        {
+            RectTransform canvasRect = _mainCanvas.GetComponent<RectTransform>();
+
+            // 기존 슬롯 패널 삭제
+            if (_slotPanel != null)
+            {
+                Destroy(_slotPanel.gameObject);
+            }
+
+            // 기존 릴 심볼들 삭제 (씬에서 설정된 것들)
+            if (_reelSymbols != null)
+            {
+                foreach (var symbol in _reelSymbols)
+                {
+                    if (symbol != null && symbol.transform.parent != null)
+                    {
+                        Destroy(symbol.transform.parent.gameObject);
+                    }
+                }
+            }
+
+            // 3x3 그리드 슬롯 패널 새로 생성
+            GameObject slotPanel = CreatePanel(canvasRect, "SlotPanel3x3", new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                _slotPanelPosition, _slotPanelSize, new Color(0.15f, 0.1f, 0.2f, 1f));
+            RectTransform slotRect = slotPanel.GetComponent<RectTransform>();
+            _slotAreaRect = slotRect;
+            _slotPanel = slotRect;
+
+            // 슬롯 프레임 아웃라인
+            AddOutline(slotPanel, new Color(0.8f, 0.6f, 0.2f), 4);
+
+            // 스핀 상태 텍스트
+            GameObject stateObj = CreateTextObject(slotRect, "SpinStateText", "READY",
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, 30), 28);
+            _spinStateText = stateObj.GetComponent<TextMeshProUGUI>();
+            _spinStateText.color = new Color(0.8f, 0.8f, 0.9f);
+            _spinStateText.alignment = TextAlignmentOptions.Center;
+
+            // 3x3 그리드 심볼들 (9개)
+            _reelSymbols = new Image[9];
+            _reelFrames = new Image[9];
+            float cellSize = _slotCellSize;
+            float spacing = _slotCellSpacing;
+
+            for (int row = 0; row < 3; row++)
+            {
+                for (int col = 0; col < 3; col++)
+                {
+                    int idx = row * 3 + col;
+
+                    float x = (col - 1) * spacing;
+                    float y = (1 - row) * spacing;
+
+                    GameObject reelBg = CreatePanel(slotRect, $"ReelBg_{idx}",
+                        new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                        new Vector2(x, y), new Vector2(cellSize, cellSize),
+                        _reelFrameBaseColor);
+
+                    reelBg.AddComponent<RectMask2D>();
+                    _reelFrames[idx] = reelBg.GetComponent<Image>();
+
+                    GameObject symbolObj = new GameObject($"Symbol_{idx}");
+                    symbolObj.transform.SetParent(reelBg.transform, false);
+                    RectTransform symRect = symbolObj.AddComponent<RectTransform>();
+                    symRect.anchorMin = Vector2.zero;
+                    symRect.anchorMax = Vector2.one;
+                    symRect.offsetMin = new Vector2(5, 5);
+                    symRect.offsetMax = new Vector2(-5, -5);
+
+                    _reelSymbols[idx] = symbolObj.AddComponent<Image>();
+                    _reelSymbols[idx].preserveAspect = true;
+                    _reelSymbols[idx].raycastTarget = false;
+
+                    Sprite sprite = GetSymbolSprite(idx);
+                    if (sprite != null)
+                    {
+                        _reelSymbols[idx].sprite = sprite;
+                        _reelSymbols[idx].color = Color.white;
+                    }
+                    else
+                    {
+                        _reelSymbols[idx].color = GetSymbolColor(idx);
+                    }
+                }
+            }
+
+            Debug.Log("[SlotClickerUI] 3x3 Slot grid recreated for existing UI!");
         }
 
         private void CreateClickArea(RectTransform parent)
         {
-            // 클릭 영역 (카지노 테이블) - 화면 중앙 아래쪽 (슬롯과 베팅 UI 사이)
+            // 클릭 영역 (카지노 테이블) - Inspector에서 설정 가능
             GameObject clickPanel = CreatePanel(parent, "ClickArea", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(0, -80), new Vector2(520, 200), new Color(0.1f, 0.4f, 0.15f, 1f));
+                _clickAreaPosition, _clickAreaSize, new Color(0.1f, 0.4f, 0.15f, 1f));
             RectTransform clickRect = clickPanel.GetComponent<RectTransform>();
 
             // 커스텀 스프라이트 적용
@@ -872,6 +1122,34 @@ namespace SlotClicker.UI
                 }
             }
 
+            // 버튼 스프라이트 로드 (스프라이트 시트에서 모든 스프라이트 로드)
+            if (_allButtonSprites == null || _allButtonSprites.Length == 0)
+            {
+                _allButtonSprites = Resources.LoadAll<Sprite>("UI/배팅_스핀버튼");
+
+                if (_allButtonSprites != null && _allButtonSprites.Length > 0)
+                {
+                    Debug.Log($"[SlotClickerUI] Button sprites loaded: {_allButtonSprites.Length} sprites");
+
+                    // 스프라이트 시트 구성 (0-19번 스프라이트):
+                    // _0~_3: 베팅 버튼 노멀 상태 (10%, 30%, 50%, ALL)
+                    // _4~_7: 베팅 버튼 선택 상태
+                    // _8~_9: 스핀 버튼 (노멀, 프레스)
+                    // _10~_13: 오토 버튼 (노멀, 프레스, 활성, 비활성)
+                    // 나머지는 여분
+
+                    // 버튼별 스프라이트 할당
+                    _bet10Sprite = GetSpriteByIndex(0);   // 10% 버튼
+                    _bet30Sprite = GetSpriteByIndex(1);   // 30% 버튼
+                    _bet50Sprite = GetSpriteByIndex(2);   // 50% 버튼
+                    _betAllSprite = GetSpriteByIndex(3);  // ALL 버튼
+                    _spinSprite = GetSpriteByIndex(8);    // SPIN 버튼 (큰 버튼)
+                    _autoSpinSprite = GetSpriteByIndex(10); // AUTO 버튼 (작은 버튼)
+
+                    Debug.Log($"[SlotClickerUI] Button sprites assigned - Bet10:{_bet10Sprite?.name}, Spin:{_spinSprite?.name}, Auto:{_autoSpinSprite?.name}");
+                }
+            }
+
             // 로드 결과 로깅
             if (_backgroundSprite != null)
                 Debug.Log($"[SlotClickerUI] ✓ Background ready: {_backgroundSprite.name} ({_backgroundSprite.rect.width}x{_backgroundSprite.rect.height})");
@@ -1090,15 +1368,19 @@ namespace SlotClicker.UI
                 if (tableText != null) tableText.transform.DOKill();
             }
 
-            // 릴 애니메이션 정리
-            for (int i = 0; i < _reelSymbols.Length; i++)
+            // 릴 애니메이션 정리 (3x3 = 9개)
+            if (_reelSymbols != null)
             {
-                if (_reelSymbols[i] != null)
+                for (int i = 0; i < _reelSymbols.Length; i++)
                 {
-                    _reelSymbols[i].transform.DOKill();
-                    _reelSymbols[i].DOKill();
+                    if (_reelSymbols[i] != null)
+                    {
+                        _reelSymbols[i].transform.DOKill();
+                        _reelSymbols[i].DOKill();
+                    }
+                    if (i < _reelFrames.Length && _reelFrames[i] != null)
+                        _reelFrames[i].DOKill();
                 }
-                if (_reelFrames[i] != null) _reelFrames[i].DOKill();
             }
 
             // 스핀 상태 텍스트 정리
@@ -1275,6 +1557,9 @@ namespace SlotClicker.UI
                 duration
             ).SetEase(Ease.OutQuad);
 
+            // 이전 스케일 애니메이션 정리 후 새 애니메이션 (연속 클릭 시 누적 방지)
+            _goldText.transform.DOKill();
+            _goldText.transform.localScale = Vector3.one;
             _goldText.transform.DOPunchScale(Vector3.one * 0.1f, 0.2f);
             UpdateBetAmount();
             UpdateStatistics();
@@ -1300,7 +1585,9 @@ namespace SlotClicker.UI
             Vector2 localPos = ScreenToCanvasPosition(screenPos);
             _game.Click.ProcessClick(localPos);
 
-            // 클릭 피드백
+            // 클릭 피드백 (이전 애니메이션 정리 - 연속 클릭 시 스케일 누적 방지)
+            _clickArea.transform.DOKill();
+            _clickArea.transform.localScale = Vector3.one;
             _clickArea.transform.DOPunchScale(Vector3.one * 0.05f, 0.1f);
         }
 
@@ -1379,13 +1666,29 @@ namespace SlotClicker.UI
             UpdateBetAmount();
 
             // 버튼 하이라이트
+            bool hasCustomSprites = _allButtonSprites != null && _allButtonSprites.Length > 0;
+
             for (int i = 0; i < _betButtons.Length; i++)
             {
+                if (_betButtons[i] == null) continue;
+
                 Image img = _betButtons[i].GetComponent<Image>();
+                if (img == null) continue;
+
                 float[] values = { 0.1f, 0.3f, 0.5f, 1f };
-                img.color = Mathf.Approximately(values[i], percentage)
-                    ? new Color(0.5f, 0.4f, 0.8f)
-                    : new Color(0.3f, 0.3f, 0.5f);
+                bool isSelected = Mathf.Approximately(values[i], percentage);
+
+                // 커스텀 스프라이트가 있으면 밝기로 하이라이트, 없으면 색상 변경
+                if (hasCustomSprites)
+                {
+                    img.color = isSelected ? Color.white : new Color(0.7f, 0.7f, 0.7f, 1f);
+                }
+                else
+                {
+                    img.color = isSelected
+                        ? new Color(0.5f, 0.4f, 0.8f)
+                        : new Color(0.3f, 0.3f, 0.5f);
+                }
             }
         }
 
@@ -1521,15 +1824,30 @@ namespace SlotClicker.UI
         {
             if (_autoSpinText == null) return;
 
+            Button autoBtn = _autoSpinButton ?? _autoSpinButtonRef;
+            Image autoImg = autoBtn?.GetComponent<Image>();
+            bool hasCustomSprites = _allButtonSprites != null && _allButtonSprites.Length > 0;
+
             if (_isAutoSpinning)
             {
                 _autoSpinText.text = $"STOP\n({_autoSpinRemaining})";
-                _autoSpinButton.GetComponent<Image>().color = new Color(0.8f, 0.3f, 0.3f);
+                if (autoImg != null)
+                {
+                    // 커스텀 스프라이트가 있으면 붉은 틴트, 없으면 색상 변경
+                    autoImg.color = hasCustomSprites
+                        ? new Color(1f, 0.7f, 0.7f, 1f)  // 붉은 틴트
+                        : new Color(0.8f, 0.3f, 0.3f);
+                }
             }
             else
             {
                 _autoSpinText.text = $"AUTO\nx{_autoSpinCount}";
-                _autoSpinButton.GetComponent<Image>().color = new Color(0.3f, 0.5f, 0.7f);
+                if (autoImg != null)
+                {
+                    autoImg.color = hasCustomSprites
+                        ? Color.white
+                        : new Color(0.3f, 0.5f, 0.7f);
+                }
             }
         }
 
@@ -1563,13 +1881,16 @@ namespace SlotClicker.UI
                 _resultText.alpha = 1f;
             }
 
-            // 각 릴 스핀 애니메이션 시작
-            for (int i = 0; i < _reelSymbols.Length; i++)
+            // 3x3 그리드 모든 릴 스핀 애니메이션 시작 (9개)
+            for (int i = 0; i < 9; i++)
             {
-                _isReelSpinning[i] = true;
-                if (_spinCoroutines[i] != null)
-                    StopCoroutine(_spinCoroutines[i]);
-                _spinCoroutines[i] = StartCoroutine(SpinReelAnimation(i));
+                if (i < _reelSymbols.Length && _reelSymbols[i] != null)
+                {
+                    _isReelSpinning[i] = true;
+                    if (_spinCoroutines[i] != null)
+                        StopCoroutine(_spinCoroutines[i]);
+                    _spinCoroutines[i] = StartCoroutine(SpinReelAnimation(i));
+                }
             }
         }
 
@@ -1578,21 +1899,28 @@ namespace SlotClicker.UI
         /// </summary>
         private System.Collections.IEnumerator SpinReelAnimation(int reelIndex)
         {
+            // 범위 체크
+            if (reelIndex < 0 || reelIndex >= _reelSymbols.Length || _reelSymbols[reelIndex] == null)
+                yield break;
+
             float spinSpeed = 0.05f; // 심볼 변경 속도
             int symbolCount = _symbolSprites != null && _symbolSprites.Length > 0
                 ? _symbolSprites.Length
                 : _game.Config.symbolCount;
 
-            while (_isReelSpinning[reelIndex])
+            while (reelIndex < _isReelSpinning.Length && _isReelSpinning[reelIndex])
             {
                 // 랜덤 심볼로 변경
                 int randomSymbol = UnityEngine.Random.Range(0, symbolCount);
                 SetReelSymbol(reelIndex, randomSymbol);
 
                 // 심볼 변경 시 살짝 흔들림 효과
-                _reelSymbols[reelIndex].transform.DOKill();
-                _reelSymbols[reelIndex].transform.localScale = Vector3.one;
-                _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.1f, spinSpeed * 0.8f, 0, 0);
+                if (_reelSymbols[reelIndex] != null)
+                {
+                    _reelSymbols[reelIndex].transform.DOKill();
+                    _reelSymbols[reelIndex].transform.localScale = Vector3.one;
+                    _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.08f, spinSpeed * 0.7f, 0, 0);
+                }
 
                 yield return new WaitForSeconds(spinSpeed);
             }
@@ -1603,7 +1931,8 @@ namespace SlotClicker.UI
         /// </summary>
         private void SetReelSymbol(int reelIndex, int symbolIndex)
         {
-            if (reelIndex < 0 || reelIndex >= _reelSymbols.Length) return;
+            if (reelIndex < 0 || _reelSymbols == null || reelIndex >= _reelSymbols.Length || _reelSymbols[reelIndex] == null)
+                return;
 
             Sprite sprite = GetSymbolSprite(symbolIndex);
             if (sprite != null)
@@ -1620,11 +1949,11 @@ namespace SlotClicker.UI
 
         private void OnReelStop(int reelIndex, int symbolIndex)
         {
-            if (reelIndex < _reelSymbols.Length)
+            if (reelIndex >= 0 && reelIndex < _reelSymbols.Length && _reelSymbols[reelIndex] != null)
             {
                 // 스핀 애니메이션 중지
                 _isReelSpinning[reelIndex] = false;
-                if (_spinCoroutines[reelIndex] != null)
+                if (reelIndex < _spinCoroutines.Length && _spinCoroutines[reelIndex] != null)
                 {
                     StopCoroutine(_spinCoroutines[reelIndex]);
                     _spinCoroutines[reelIndex] = null;
@@ -1638,11 +1967,11 @@ namespace SlotClicker.UI
                 SetReelSymbol(reelIndex, symbolIndex);
 
                 // 정지 효과 (바운스)
-                _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.25f, 0.4f, 5, 0.5f);
+                _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.2f, 0.3f, 4, 0.5f);
 
-                // 정지 사운드 효과를 위한 플래시
-                _reelSymbols[reelIndex].DOColor(Color.white * 1.5f, 0.1f)
-                    .OnComplete(() => _reelSymbols[reelIndex].DOColor(Color.white, 0.2f));
+                // 정지 플래시 효과
+                _reelSymbols[reelIndex].DOColor(Color.white * 1.3f, 0.08f)
+                    .OnComplete(() => _reelSymbols[reelIndex].DOColor(Color.white, 0.15f));
             }
 
             if (_spinState == SpinUIState.Spinning)
@@ -1762,25 +2091,42 @@ namespace SlotClicker.UI
 
         private int[] GetWinningReelIndices(SlotResult result)
         {
-            if (result == null || result.Symbols == null || result.Symbols.Length < 3)
+            if (result == null || result.WinningPayline == null || result.WinningPayline.Length == 0)
                 return Array.Empty<int>();
 
-            int a = result.Symbols[0];
-            int b = result.Symbols[1];
-            int c = result.Symbols[2];
+            // 당첨 페이라인의 인덱스들을 반환
+            System.Collections.Generic.HashSet<int> winningIndices = new System.Collections.Generic.HashSet<int>();
 
-            if (a == b && b == c)
-                return new[] { 0, 1, 2 };
+            // 3x3 페이라인 정의 (SlotManager.SlotPaylines와 동일)
+            int[][] paylines = new int[][]
+            {
+                new int[] { 3, 4, 5 },  // 중간 가로
+                new int[] { 0, 1, 2 },  // 상단 가로
+                new int[] { 6, 7, 8 },  // 하단 가로
+                new int[] { 0, 4, 8 },  // 대각선 ↘
+                new int[] { 6, 4, 2 }   // 대각선 ↗
+            };
 
-            if (a == b) return new[] { 0, 1 };
-            if (b == c) return new[] { 1, 2 };
-            if (a == c) return new[] { 0, 2 };
+            foreach (int paylineIdx in result.WinningPayline)
+            {
+                if (paylineIdx >= 0 && paylineIdx < paylines.Length)
+                {
+                    foreach (int idx in paylines[paylineIdx])
+                    {
+                        winningIndices.Add(idx);
+                    }
+                }
+            }
 
-            return Array.Empty<int>();
+            int[] resultArray = new int[winningIndices.Count];
+            winningIndices.CopyTo(resultArray);
+            return resultArray;
         }
 
         private void HighlightReels(int[] indices, Color color)
         {
+            if (indices == null || _reelSymbols == null) return;
+
             for (int i = 0; i < indices.Length; i++)
             {
                 int reelIndex = indices[i];
@@ -1789,15 +2135,16 @@ namespace SlotClicker.UI
                 if (_reelSymbols[reelIndex] != null)
                 {
                     _reelSymbols[reelIndex].transform.DOKill();
-                    _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.2f, 0.35f, 5, 0.6f);
+                    _reelSymbols[reelIndex].transform.localScale = Vector3.one;
+                    _reelSymbols[reelIndex].transform.DOPunchScale(Vector3.one * 0.25f, 0.4f, 5, 0.6f);
                 }
 
-                if (_reelFrames[reelIndex] != null)
+                if (reelIndex < _reelFrames.Length && _reelFrames[reelIndex] != null)
                 {
                     Image frame = _reelFrames[reelIndex];
-                    Color original = frame.color;
+                    Color original = _reelFrameBaseColor;
                     frame.DOKill();
-                    frame.DOColor(color, 0.12f).SetLoops(4, LoopType.Yoyo)
+                    frame.DOColor(color, 0.12f).SetLoops(6, LoopType.Yoyo)
                         .OnComplete(() => frame.color = original);
                 }
             }
