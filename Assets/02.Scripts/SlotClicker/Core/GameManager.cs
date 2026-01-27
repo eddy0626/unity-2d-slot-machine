@@ -32,6 +32,9 @@ namespace SlotClicker.Core
         public UpgradeManager Upgrade { get; private set; }
         public PrestigeManager Prestige { get; private set; }
 
+        // SoundManager는 싱글톤으로 접근
+        public SoundManager Sound => SoundManager.Instance;
+
         // 플레이어 데이터
         public PlayerData PlayerData { get; private set; }
         public GameConfig Config => _config;

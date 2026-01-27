@@ -76,11 +76,40 @@ namespace SlotClicker.UI
         private Sprite _betAllSprite;     // ALL 버튼
         private Sprite _spinSprite;       // SPIN 버튼
         private Sprite _autoSpinSprite;   // AUTO 버튼
+        private Sprite _coinSprite;       // 플로팅 텍스트용 코인 스프라이트
 
         [Header("=== 색상 설정 ===")]
         [SerializeField] private Color _normalClickColor = new Color(0.2f, 0.6f, 0.2f);
         [SerializeField] private Color _criticalColor = new Color(1f, 0.8f, 0f);
         [SerializeField] private Color _jackpotColor = new Color(1f, 0.2f, 0.2f);
+
+        [Header("=== 클릭 피드백 ===")]
+        [SerializeField] private bool _enableClickRipple = true;
+        [SerializeField, Range(0.03f, 0.2f)] private float _clickPulseStrength = 0.08f;
+        [SerializeField, Range(0.08f, 0.35f)] private float _criticalPulseStrength = 0.16f;
+        [SerializeField, Range(0.08f, 0.4f)] private float _clickPulseDuration = 0.18f;
+        [SerializeField, Range(0.25f, 1.2f)] private float _rippleDuration = 0.55f;
+        [SerializeField, Range(1.2f, 3.5f)] private float _rippleMaxScale = 2.3f;
+        [SerializeField] private Color _rippleColor = new Color(1f, 0.9f, 0.4f, 0.9f);
+        [SerializeField] private Color _criticalRippleColor = new Color(1f, 0.55f, 0.15f, 1f);
+
+        [Header("=== 클릭 사운드 ===")]
+        [SerializeField] private AudioClip _clickSfx;
+        [SerializeField] private AudioClip _criticalClickSfx;
+        [SerializeField, Range(0f, 1f)] private float _clickSfxVolume = 0.7f;
+        [SerializeField, Range(0f, 0.2f)] private float _clickPitchJitter = 0.06f;
+        [SerializeField, Range(0.9f, 1.4f)] private float _criticalPitch = 1.08f;
+        [SerializeField, Range(1f, 2f)] private float _criticalSfxVolumeMultiplier = 1.35f;
+
+        [Header("=== 크리티컬 연출 ===")]
+        [SerializeField] private bool _enableCriticalFlash = true;
+        [SerializeField] private Color _criticalFlashColor = new Color(1f, 0.85f, 0.35f, 0.6f);
+        [SerializeField, Range(0.05f, 0.35f)] private float _criticalFlashDuration = 0.2f;
+        [SerializeField] private bool _enableCriticalShake = true;
+        [SerializeField, Range(0.05f, 0.6f)] private float _criticalShakeDuration = 0.22f;
+        [SerializeField, Range(5f, 60f)] private float _criticalShakeStrength = 22f;
+        [SerializeField, Range(8, 40)] private int _criticalShakeVibrato = 20;
+        [SerializeField, Range(0f, 90f)] private float _criticalShakeRandomness = 70f;
 
         [Header("=== 업그레이드 UI ===")]
         [SerializeField] private Button _upgradeButton;
@@ -124,6 +153,33 @@ namespace SlotClicker.UI
         private List<GameObject> _activeFloatingTexts = new List<GameObject>();
         private const int POOL_INITIAL_SIZE = 10;
         private const int POOL_MAX_SIZE = 30;
+
+        // 클릭 리플 이펙트 풀
+        private GameObject _ripplePrefab;
+        private Queue<GameObject> _ripplePool = new Queue<GameObject>();
+        private List<GameObject> _activeRipples = new List<GameObject>();
+        private const int RIPPLE_POOL_INITIAL_SIZE = 12;
+        private const int RIPPLE_POOL_MAX_SIZE = 40;
+
+        // 클릭 영역 시각 피드백
+        private RectTransform _clickAreaRect;
+        private Image _clickAreaImage;
+        private Image _clickGlowImage;
+        private Color _clickAreaBaseColor = Color.white;
+        private Tween _clickGlowTween;
+        private bool _createdClickGlow;
+
+        // 클릭 사운드
+        private AudioSource _clickAudioSource;
+        private bool _createdClickAudioSource;
+
+        // 크리티컬 연출 레이어/셰이크
+        private Image _criticalFlashImage;
+        private Tween _criticalFlashTween;
+        private Transform _shakeTarget;
+        private Vector3 _shakeOriginalPosition;
+        private Tween _shakeTween;
+        private bool _createdCriticalFlash;
 
         // 슬롯 스핀 관련 (3x3 = 9개)
         private Coroutine[] _spinCoroutines = new Coroutine[9];
@@ -268,6 +324,9 @@ namespace SlotClicker.UI
             // 플로팅 텍스트 프리팹 생성
             CreateFloatingTextPrefab();
 
+            // 클릭 피드백(리플/글로우) 준비
+            SetupClickFeedback();
+
             // 업그레이드 UI 생성
             CreateUpgradeUI();
 
@@ -347,6 +406,9 @@ namespace SlotClicker.UI
 
             // === 플로팅 텍스트 프리팹 ===
             CreateFloatingTextPrefab();
+
+            // === 클릭 피드백(리플/글로우) 준비 ===
+            SetupClickFeedback();
 
             // === 업그레이드 버튼 ===
             CreateUpgradeButton(canvasRect);
@@ -873,13 +935,59 @@ namespace SlotClicker.UI
             _floatingTextPrefab.SetActive(false);
 
             RectTransform rect = _floatingTextPrefab.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(200, 50);
+            rect.sizeDelta = new Vector2(250, 60);
 
-            TextMeshProUGUI tmp = _floatingTextPrefab.AddComponent<TextMeshProUGUI>();
+            // 가로 레이아웃 그룹 추가 (코인 + 텍스트)
+            HorizontalLayoutGroup layout = _floatingTextPrefab.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 8f;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = false;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            // 코인 이미지 추가
+            if (_coinSprite != null)
+            {
+                GameObject coinObj = new GameObject("CoinIcon");
+                coinObj.transform.SetParent(_floatingTextPrefab.transform, false);
+
+                RectTransform coinRect = coinObj.AddComponent<RectTransform>();
+                coinRect.sizeDelta = new Vector2(40, 40);
+
+                Image coinImage = coinObj.AddComponent<Image>();
+                coinImage.sprite = _coinSprite;
+                coinImage.preserveAspect = true;
+                coinImage.raycastTarget = false;
+
+                // LayoutElement로 크기 고정
+                LayoutElement coinLayout = coinObj.AddComponent<LayoutElement>();
+                coinLayout.preferredWidth = 40;
+                coinLayout.preferredHeight = 40;
+            }
+
+            // 텍스트 추가
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(_floatingTextPrefab.transform, false);
+
+            RectTransform textRect = textObj.AddComponent<RectTransform>();
+            textRect.sizeDelta = new Vector2(180, 50);
+
+            TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.fontSize = 40;
             tmp.fontStyle = FontStyles.Bold;
-            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.alignment = TextAlignmentOptions.Left;
             tmp.color = Color.yellow;
+
+            // LayoutElement로 텍스트 영역 설정
+            LayoutElement textLayout = textObj.AddComponent<LayoutElement>();
+            textLayout.preferredWidth = 180;
+            textLayout.preferredHeight = 50;
+
+            // ContentSizeFitter로 전체 크기 자동 조절
+            ContentSizeFitter fitter = _floatingTextPrefab.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             _floatingTextPrefab.transform.SetParent(_mainCanvas.transform, false);
 
@@ -977,6 +1085,433 @@ namespace SlotClicker.UI
 
             if (_floatingTextPrefab != null)
                 Destroy(_floatingTextPrefab);
+        }
+
+        /// <summary>
+        /// 클릭 피드백(리플/글로우) 준비
+        /// </summary>
+        private void SetupClickFeedback()
+        {
+            EnsureClickVisuals();
+            CreateRipplePrefab();
+            if (_clickSfx != null || _criticalClickSfx != null)
+            {
+                EnsureClickAudioSource();
+            }
+        }
+
+        /// <summary>
+        /// 클릭 영역의 이미지/글로우 레이어를 확보
+        /// </summary>
+        private void EnsureClickVisuals()
+        {
+            if (_clickArea == null) return;
+
+            _clickAreaRect = _clickArea.GetComponent<RectTransform>();
+            _clickAreaImage = _clickArea.GetComponent<Image>();
+
+            if (_clickAreaImage != null)
+            {
+                _clickAreaBaseColor = _clickAreaImage.color;
+            }
+
+            if (_clickGlowImage == null)
+            {
+                Transform existingGlow = _clickArea.transform.Find("ClickGlow");
+                if (existingGlow != null)
+                {
+                    _clickGlowImage = existingGlow.GetComponent<Image>();
+                }
+            }
+
+            if (_clickGlowImage != null) return;
+
+            GameObject glowObj = new GameObject("ClickGlow");
+            glowObj.transform.SetParent(_clickArea.transform, false);
+
+            RectTransform glowRect = glowObj.AddComponent<RectTransform>();
+            glowRect.anchorMin = Vector2.zero;
+            glowRect.anchorMax = Vector2.one;
+            glowRect.offsetMin = Vector2.zero;
+            glowRect.offsetMax = Vector2.zero;
+            glowRect.localScale = Vector3.one;
+
+            _clickGlowImage = glowObj.AddComponent<Image>();
+            _clickGlowImage.raycastTarget = false;
+            _createdClickGlow = true;
+
+            Sprite glowSprite = _clickAreaImage != null && _clickAreaImage.sprite != null
+                ? _clickAreaImage.sprite
+                : Resources.GetBuiltinResource<Sprite>("UI/Skin/Background.psd");
+
+            _clickGlowImage.sprite = glowSprite;
+            _clickGlowImage.type = _clickAreaImage != null ? _clickAreaImage.type : Image.Type.Sliced;
+            _clickGlowImage.color = new Color(_rippleColor.r, _rippleColor.g, _rippleColor.b, 0f);
+        }
+
+        /// <summary>
+        /// 클릭 리플 프리팹 생성 및 풀 초기화
+        /// </summary>
+        private void CreateRipplePrefab()
+        {
+            if (_mainCanvas == null || !_enableClickRipple) return;
+            if (_ripplePrefab != null) return;
+
+            _ripplePrefab = new GameObject("ClickRipplePrefab");
+            _ripplePrefab.SetActive(false);
+
+            RectTransform rect = _ripplePrefab.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(140f, 140f);
+
+            Image img = _ripplePrefab.AddComponent<Image>();
+            img.raycastTarget = false;
+            img.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+            img.color = _rippleColor;
+
+            _ripplePrefab.transform.SetParent(_mainCanvas.transform, false);
+
+            InitializeRipplePool();
+        }
+
+        private void InitializeRipplePool()
+        {
+            for (int i = 0; i < RIPPLE_POOL_INITIAL_SIZE; i++)
+            {
+                GameObject pooled = CreatePooledRipple();
+                _ripplePool.Enqueue(pooled);
+            }
+        }
+
+        private GameObject CreatePooledRipple()
+        {
+            GameObject obj = Instantiate(_ripplePrefab, _mainCanvas.transform);
+            obj.name = "PooledClickRipple";
+            obj.SetActive(false);
+            return obj;
+        }
+
+        private GameObject GetRippleFromPool()
+        {
+            GameObject obj;
+            if (_ripplePool.Count > 0)
+            {
+                obj = _ripplePool.Dequeue();
+            }
+            else if (_activeRipples.Count < RIPPLE_POOL_MAX_SIZE)
+            {
+                obj = CreatePooledRipple();
+            }
+            else
+            {
+                obj = _activeRipples[0];
+                _activeRipples.RemoveAt(0);
+                obj.transform.DOKill();
+                Image activeImg = obj.GetComponent<Image>();
+                if (activeImg != null) activeImg.DOKill();
+            }
+
+            _activeRipples.Add(obj);
+            return obj;
+        }
+
+        private void ReturnRippleToPool(GameObject obj)
+        {
+            if (obj == null) return;
+
+            obj.transform.DOKill();
+            Image img = obj.GetComponent<Image>();
+            if (img != null) img.DOKill();
+
+            obj.SetActive(false);
+            _activeRipples.Remove(obj);
+
+            if (_ripplePool.Count < RIPPLE_POOL_MAX_SIZE)
+            {
+                _ripplePool.Enqueue(obj);
+            }
+            else
+            {
+                Destroy(obj);
+            }
+        }
+
+        private void CleanupRipplePool()
+        {
+            foreach (var obj in _activeRipples)
+            {
+                if (obj == null) continue;
+                obj.transform.DOKill();
+                Image img = obj.GetComponent<Image>();
+                if (img != null) img.DOKill();
+                Destroy(obj);
+            }
+            _activeRipples.Clear();
+
+            while (_ripplePool.Count > 0)
+            {
+                var obj = _ripplePool.Dequeue();
+                if (obj == null) continue;
+                obj.transform.DOKill();
+                Image img = obj.GetComponent<Image>();
+                if (img != null) img.DOKill();
+                Destroy(obj);
+            }
+
+            if (_ripplePrefab != null)
+            {
+                Destroy(_ripplePrefab);
+            }
+        }
+
+        /// <summary>
+        /// 클릭 사운드용 AudioSource 확보
+        /// </summary>
+        private void EnsureClickAudioSource()
+        {
+            if (_clickAudioSource != null) return;
+
+            if (_mainCanvas != null)
+            {
+                Transform existingAudio = _mainCanvas.transform.Find("ClickSFXSource");
+                if (existingAudio != null)
+                {
+                    _clickAudioSource = existingAudio.GetComponent<AudioSource>();
+                }
+            }
+
+            if (_clickAudioSource != null) return;
+
+            GameObject audioObj = new GameObject("ClickSFXSource");
+            if (_mainCanvas != null)
+            {
+                audioObj.transform.SetParent(_mainCanvas.transform, false);
+            }
+            else
+            {
+                audioObj.transform.SetParent(transform, false);
+            }
+
+            _clickAudioSource = audioObj.AddComponent<AudioSource>();
+            _clickAudioSource.playOnAwake = false;
+            _clickAudioSource.loop = false;
+            _clickAudioSource.spatialBlend = 0f;
+            _createdClickAudioSource = true;
+        }
+
+        /// <summary>
+        /// 클릭 사운드 재생 (크리티컬은 더 강하게)
+        /// </summary>
+        private void PlayClickSound(bool isCritical)
+        {
+            if (_clickSfx == null && _criticalClickSfx == null) return;
+            EnsureClickAudioSource();
+            if (_clickAudioSource == null) return;
+
+            AudioClip clipToPlay = isCritical && _criticalClickSfx != null ? _criticalClickSfx : _clickSfx;
+            if (clipToPlay == null) return;
+
+            float pitch = isCritical
+                ? _criticalPitch
+                : 1f + UnityEngine.Random.Range(-_clickPitchJitter, _clickPitchJitter);
+
+            float volume = isCritical
+                ? Mathf.Clamp01(_clickSfxVolume * _criticalSfxVolumeMultiplier)
+                : _clickSfxVolume;
+
+            _clickAudioSource.pitch = pitch;
+            _clickAudioSource.PlayOneShot(clipToPlay, volume);
+        }
+
+        /// <summary>
+        /// 크리티컬 플래시 레이어 확보
+        /// </summary>
+        private void EnsureCriticalFlashLayer()
+        {
+            if (!_enableCriticalFlash || _mainCanvas == null) return;
+            if (_criticalFlashImage == null)
+            {
+                Transform existingFlash = _mainCanvas.transform.Find("CriticalFlash");
+                if (existingFlash != null)
+                {
+                    _criticalFlashImage = existingFlash.GetComponent<Image>();
+                }
+            }
+            if (_criticalFlashImage != null) return;
+
+            GameObject flashObj = new GameObject("CriticalFlash");
+            flashObj.transform.SetParent(_mainCanvas.transform, false);
+
+            RectTransform rect = flashObj.AddComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.localScale = Vector3.one;
+
+            _criticalFlashImage = flashObj.AddComponent<Image>();
+            _criticalFlashImage.raycastTarget = false;
+            _criticalFlashImage.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Background.psd");
+            _createdCriticalFlash = true;
+            _criticalFlashImage.color = new Color(
+                _criticalFlashColor.r,
+                _criticalFlashColor.g,
+                _criticalFlashColor.b,
+                0f);
+        }
+
+        /// <summary>
+        /// 크리티컬 전용 화면 번쩍임
+        /// </summary>
+        private void PlayCriticalFlash()
+        {
+            if (!_enableCriticalFlash || _mainCanvas == null) return;
+            EnsureCriticalFlashLayer();
+            if (_criticalFlashImage == null) return;
+
+            _criticalFlashImage.transform.SetAsLastSibling();
+            _criticalFlashImage.DOKill();
+            _criticalFlashTween?.Kill();
+
+            Color flashColor = _criticalFlashColor;
+            _criticalFlashImage.color = flashColor;
+
+            _criticalFlashTween = _criticalFlashImage
+                .DOFade(0f, _criticalFlashDuration)
+                .SetEase(Ease.OutQuad);
+        }
+
+        /// <summary>
+        /// 셰이크 타겟(카메라 우선) 해결
+        /// </summary>
+        private void ResolveShakeTarget()
+        {
+            if (_shakeTarget != null) return;
+
+            if (Camera.main != null)
+            {
+                _shakeTarget = Camera.main.transform;
+                return;
+            }
+
+            if (_mainCanvas != null)
+            {
+                _shakeTarget = _mainCanvas.transform;
+                return;
+            }
+
+            _shakeTarget = transform;
+        }
+
+        /// <summary>
+        /// 크리티컬 전용 카메라/화면 셰이크
+        /// </summary>
+        private void PlayCriticalShake()
+        {
+            if (!_enableCriticalShake) return;
+
+            ResolveShakeTarget();
+            if (_shakeTarget == null) return;
+
+            _shakeTween?.Kill();
+            _shakeTarget.DOKill();
+
+            _shakeOriginalPosition = _shakeTarget.position;
+
+            float strength = _criticalShakeStrength;
+            if (_shakeTarget.GetComponent<Camera>() != null)
+            {
+                // 카메라는 월드 유닛이므로 픽셀 기반 강도를 축소
+                strength *= 0.02f;
+            }
+
+            _shakeTween = _shakeTarget
+                .DOShakePosition(
+                    _criticalShakeDuration,
+                    strength,
+                    _criticalShakeVibrato,
+                    _criticalShakeRandomness,
+                    false,
+                    true)
+                .SetEase(Ease.OutQuad)
+                .OnComplete(() =>
+                {
+                    if (_shakeTarget != null)
+                    {
+                        _shakeTarget.position = _shakeOriginalPosition;
+                    }
+                });
+        }
+
+        /// <summary>
+        /// 클릭 위치에 리플 이펙트 생성
+        /// </summary>
+        private void SpawnClickRipple(Vector2 position, bool isCritical)
+        {
+            if (!_enableClickRipple || _mainCanvas == null) return;
+
+            GameObject ripple = GetRippleFromPool();
+            ripple.SetActive(true);
+
+            RectTransform rect = ripple.GetComponent<RectTransform>();
+            rect.anchoredPosition = position;
+            rect.localScale = Vector3.one * (isCritical ? 0.8f : 0.65f);
+            rect.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(-12f, 12f));
+
+            Image img = ripple.GetComponent<Image>();
+            Color rippleColor = isCritical ? _criticalRippleColor : _rippleColor;
+            float startAlpha = isCritical ? 0.95f : 0.8f;
+            img.color = new Color(rippleColor.r, rippleColor.g, rippleColor.b, startAlpha);
+
+            float duration = isCritical ? _rippleDuration * 1.15f : _rippleDuration;
+            float maxScale = isCritical ? _rippleMaxScale * 1.25f : _rippleMaxScale;
+
+            Sequence seq = DOTween.Sequence();
+            seq.Append(rect.DOScale(maxScale, duration).SetEase(Ease.OutCubic));
+            seq.Join(img.DOFade(0f, duration).SetEase(Ease.OutQuad));
+            seq.OnComplete(() => ReturnRippleToPool(ripple));
+        }
+
+        /// <summary>
+        /// 클릭 영역 자체의 펀치/글로우 피드백
+        /// </summary>
+        private void PlayClickAreaFeedback(bool isCritical)
+        {
+            if (_clickArea == null) return;
+            EnsureClickVisuals();
+
+            float strength = isCritical ? _criticalPulseStrength : _clickPulseStrength;
+            float duration = isCritical ? _clickPulseDuration * 1.2f : _clickPulseDuration;
+
+            _clickArea.transform.DOKill();
+            _clickArea.transform.localScale = Vector3.one;
+            _clickArea.transform.DOPunchScale(Vector3.one * strength, duration, 10, 0.9f)
+                .SetEase(Ease.OutQuad);
+
+            if (_clickAreaImage != null)
+            {
+                _clickAreaImage.DOKill();
+                Color flashColor = isCritical ? _criticalColor : _normalClickColor;
+                flashColor.a = _clickAreaBaseColor.a;
+                _clickAreaImage.color = flashColor;
+                _clickAreaImage.DOColor(_clickAreaBaseColor, duration * 1.35f);
+            }
+
+            if (_clickGlowImage == null) return;
+
+            _clickGlowImage.DOKill();
+            _clickGlowTween?.Kill();
+
+            RectTransform glowRect = _clickGlowImage.rectTransform;
+            glowRect.localScale = Vector3.one * (isCritical ? 0.98f : 0.96f);
+
+            Color glowColor = isCritical ? _criticalRippleColor : _rippleColor;
+            float glowAlpha = isCritical ? 0.72f : 0.45f;
+            _clickGlowImage.color = new Color(glowColor.r, glowColor.g, glowColor.b, glowAlpha);
+
+            Sequence glowSeq = DOTween.Sequence();
+            glowSeq.Append(glowRect.DOScale(isCritical ? 1.1f : 1.06f, duration * 1.25f).SetEase(Ease.OutQuad));
+            glowSeq.Join(_clickGlowImage.DOFade(0f, duration * 1.4f).SetEase(Ease.OutQuad));
+            _clickGlowTween = glowSeq;
         }
 
         #region Helper Methods
@@ -1150,6 +1685,19 @@ namespace SlotClicker.UI
                 }
             }
 
+            // 코인 스프라이트 로드 (플로팅 텍스트용)
+            if (_coinSprite == null)
+            {
+                Sprite[] coinSprites = Resources.LoadAll<Sprite>("UI/코인");
+
+                if (coinSprites != null && coinSprites.Length > 0)
+                {
+                    // 첫 번째 스프라이트(코인_0)만 사용
+                    _coinSprite = coinSprites[0];
+                    Debug.Log($"[SlotClickerUI] Coin sprite auto-loaded: {_coinSprite.name}");
+                }
+            }
+
             // 로드 결과 로깅
             if (_backgroundSprite != null)
                 Debug.Log($"[SlotClickerUI] ✓ Background ready: {_backgroundSprite.name} ({_backgroundSprite.rect.width}x{_backgroundSprite.rect.height})");
@@ -1160,6 +1708,11 @@ namespace SlotClicker.UI
                 Debug.Log($"[SlotClickerUI] ✓ Click panel ready: {_clickPanelSprite.name}");
             else
                 Debug.LogWarning("[SlotClickerUI] ✗ No click panel sprite - using default color");
+
+            if (_coinSprite != null)
+                Debug.Log($"[SlotClickerUI] ✓ Coin sprite ready: {_coinSprite.name}");
+            else
+                Debug.LogWarning("[SlotClickerUI] ✗ No coin sprite - floating text will show without coin icon");
         }
 
         /// <summary>
@@ -1386,8 +1939,46 @@ namespace SlotClicker.UI
             // 스핀 상태 텍스트 정리
             if (_spinStateText != null) _spinStateText.transform.DOKill();
 
+            // 클릭 피드백 정리
+            _clickGlowTween?.Kill();
+            if (_clickAreaImage != null) _clickAreaImage.DOKill();
+            if (_clickGlowImage != null)
+            {
+                _clickGlowImage.DOKill();
+                _clickGlowImage.rectTransform.DOKill();
+            }
+            _criticalFlashTween?.Kill();
+            _shakeTween?.Kill();
+            if (_criticalFlashImage != null)
+            {
+                _criticalFlashImage.DOKill();
+                if (_createdCriticalFlash)
+                {
+                    Destroy(_criticalFlashImage.gameObject);
+                }
+                else
+                {
+                    Color c = _criticalFlashImage.color;
+                    _criticalFlashImage.color = new Color(c.r, c.g, c.b, 0f);
+                }
+                _criticalFlashImage = null;
+            }
+            if (_clickAudioSource != null)
+            {
+                if (_createdClickAudioSource)
+                {
+                    Destroy(_clickAudioSource.gameObject);
+                }
+                else
+                {
+                    _clickAudioSource.Stop();
+                }
+                _clickAudioSource = null;
+            }
+
             // 플로팅 텍스트 풀 정리
             CleanupFloatingTextPool();
+            CleanupRipplePool();
 
             // 이벤트 구독 해제 (null-safe)
             if (_game != null)
@@ -1584,17 +2175,22 @@ namespace SlotClicker.UI
 
             Vector2 localPos = ScreenToCanvasPosition(screenPos);
             _game.Click.ProcessClick(localPos);
-
-            // 클릭 피드백 (이전 애니메이션 정리 - 연속 클릭 시 스케일 누적 방지)
-            _clickArea.transform.DOKill();
-            _clickArea.transform.localScale = Vector3.one;
-            _clickArea.transform.DOPunchScale(Vector3.one * 0.05f, 0.1f);
         }
 
         private void OnClickResult(ClickResult result)
         {
-            // 플로팅 텍스트 생성
+            // 클릭 사운드 + 플로팅 텍스트 + 리플 + 클릭 영역 피드백
+            PlayClickSound(result.IsCritical);
+            SpawnClickRipple(result.Position, result.IsCritical);
             SpawnFloatingText(result.Position, result.GoldEarned, result.IsCritical);
+            PlayClickAreaFeedback(result.IsCritical);
+
+            if (result.IsCritical)
+            {
+                PlayCriticalFlash();
+                PlayCriticalShake();
+                UIFeedback.TriggerHaptic(UIFeedback.HapticType.Medium);
+            }
         }
 
         private void SpawnFloatingText(Vector2 position, double amount, bool isCritical)
@@ -1602,21 +2198,81 @@ namespace SlotClicker.UI
             // 오브젝트 풀에서 가져오기 (Instantiate 대신)
             GameObject floatText = GetFloatingTextFromPool();
             floatText.SetActive(true);
+            floatText.transform.SetAsLastSibling();
 
             RectTransform rect = floatText.GetComponent<RectTransform>();
-            rect.anchoredPosition = position;
-            rect.localScale = Vector3.one;
+            rect.DOKill();
+            floatText.transform.DOKill();
 
-            TextMeshProUGUI tmp = floatText.GetComponent<TextMeshProUGUI>();
+            Vector2 startPos = position + new Vector2(
+                UnityEngine.Random.Range(-14f, 14f),
+                UnityEngine.Random.Range(-6f, 12f));
+
+            rect.anchoredPosition = startPos;
+            rect.localScale = Vector3.one * (isCritical ? 0.95f : 0.85f);
+            rect.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(-6f, 6f));
+
+            // 자식에서 텍스트 컴포넌트 찾기
+            Transform textChild = floatText.transform.Find("Text");
+            TextMeshProUGUI tmp = textChild != null
+                ? textChild.GetComponent<TextMeshProUGUI>()
+                : floatText.GetComponent<TextMeshProUGUI>();
+
+            tmp.DOKill();
             tmp.text = $"+{GoldManager.FormatNumber(amount)}";
             tmp.color = isCritical ? _criticalColor : Color.yellow;
             tmp.fontSize = isCritical ? 52 : 40;
             tmp.alpha = 1f; // 알파 초기화 (풀에서 재사용 시 필요)
 
+            // 코인 아이콘 알파 초기화 및 크기 조정
+            Transform coinChild = floatText.transform.Find("CoinIcon");
+            Image coinImage = coinChild != null ? coinChild.GetComponent<Image>() : null;
+            if (coinImage != null)
+            {
+                coinImage.DOKill();
+                Color coinColor = coinImage.color;
+                coinColor.a = 1f;
+                coinImage.color = coinColor;
+
+                // 크리티컬일 때 코인도 크게
+                RectTransform coinRect = coinChild.GetComponent<RectTransform>();
+                if (coinRect != null)
+                {
+                    float coinSize = isCritical ? 52f : 40f;
+                    coinRect.sizeDelta = new Vector2(coinSize, coinSize);
+                    LayoutElement coinLayout = coinChild.GetComponent<LayoutElement>();
+                    if (coinLayout != null)
+                    {
+                        coinLayout.preferredWidth = coinSize;
+                        coinLayout.preferredHeight = coinSize;
+                    }
+                }
+            }
+
             // 애니메이션 (완료 시 풀에 반환)
+            float travelY = isCritical ? 185f : 135f;
+            float horizontalDrift = UnityEngine.Random.Range(-40f, 40f);
+            float duration = isCritical ? 1.0f : 0.85f;
+            Vector2 targetPos = startPos + new Vector2(horizontalDrift, travelY);
+
             Sequence seq = DOTween.Sequence();
-            seq.Append(rect.DOAnchorPosY(rect.anchoredPosition.y + 100, 0.8f).SetEase(Ease.OutQuad));
-            seq.Join(tmp.DOFade(0, 0.8f).SetEase(Ease.InQuad));
+            seq.Append(rect.DOScale(isCritical ? 1.25f : 1.08f, 0.12f).SetEase(Ease.OutQuad));
+            seq.Append(rect.DOScale(1f, isCritical ? 0.26f : 0.18f).SetEase(Ease.OutBack));
+
+            seq.Join(rect.DOAnchorPos(targetPos, duration).SetEase(isCritical ? Ease.OutCubic : Ease.OutQuad));
+            seq.Join(tmp.DOFade(0f, duration * 0.9f).SetDelay(duration * 0.1f).SetEase(Ease.OutQuad));
+
+            // 코인 이미지도 함께 페이드 아웃
+            if (coinImage != null)
+            {
+                seq.Join(coinImage.DOFade(0f, duration * 0.9f).SetDelay(duration * 0.1f).SetEase(Ease.OutQuad));
+            }
+
+            if (isCritical)
+            {
+                seq.Join(rect.DOPunchRotation(new Vector3(0f, 0f, 16f), 0.45f, 12, 0.85f));
+            }
+
             seq.OnComplete(() => ReturnFloatingTextToPool(floatText));
         }
 

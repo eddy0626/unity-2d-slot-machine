@@ -14,6 +14,12 @@ namespace SlotClicker.Core
         [SerializeField] private GameConfig _config;
         [SerializeField] private bool _createUIOnStart = true;
 
+        [Header("=== 사운드 설정 ===")]
+        [Tooltip("사운드 매니저 자동 생성")]
+        [SerializeField] private bool _enableSoundManager = true;
+        [Tooltip("게임 시작 시 음소거")]
+        [SerializeField] private bool _startMuted = false;
+
         [Header("=== 화면 회전 설정 ===")]
         [Tooltip("화면 회전 관리자 자동 생성")]
         [SerializeField] private bool _enableOrientationManager = true;
@@ -46,6 +52,12 @@ namespace SlotClicker.Core
             {
                 CreateOrientationManager();
             }
+
+            // SoundManager 생성
+            if (_enableSoundManager && SoundManager.Instance == null)
+            {
+                CreateSoundManager();
+            }
         }
 
         private void Start()
@@ -72,6 +84,12 @@ namespace SlotClicker.Core
             if (_createUIOnStart)
             {
                 CreateUI();
+            }
+
+            // SoundConnector 생성 (게임 초기화 후)
+            if (_enableSoundManager && SoundManager.Instance != null)
+            {
+                CreateSoundConnector();
             }
 
             Debug.Log("[SlotClickerInitializer] Game initialized!");
@@ -125,6 +143,41 @@ namespace SlotClicker.Core
             orientationManager.LoadSettings();
 
             Debug.Log("[SlotClickerInitializer] OrientationManager created.");
+        }
+
+        /// <summary>
+        /// SoundManager 생성 및 초기화
+        /// </summary>
+        private void CreateSoundManager()
+        {
+            GameObject soundObj = new GameObject("SoundManager");
+            SoundManager soundManager = soundObj.AddComponent<SoundManager>();
+
+            // 시작 시 음소거 옵션
+            if (_startMuted)
+            {
+                soundManager.SetMute(true);
+            }
+
+            Debug.Log("[SlotClickerInitializer] SoundManager created.");
+        }
+
+        /// <summary>
+        /// SoundConnector 생성 (게임 이벤트와 사운드 연결)
+        /// </summary>
+        private void CreateSoundConnector()
+        {
+            if (GameManager.Instance == null) return;
+
+            // GameManager에 SoundConnector 부착
+            SoundConnector connector = GameManager.Instance.gameObject.GetComponent<SoundConnector>();
+            if (connector == null)
+            {
+                connector = GameManager.Instance.gameObject.AddComponent<SoundConnector>();
+                connector.Initialize(GameManager.Instance);
+            }
+
+            Debug.Log("[SlotClickerInitializer] SoundConnector created.");
         }
 
         /// <summary>
