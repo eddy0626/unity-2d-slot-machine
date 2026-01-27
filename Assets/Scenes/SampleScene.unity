@@ -855,8 +855,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 0, y: -180}
-  m_SizeDelta: {x: 520, y: 160}
+  m_AnchoredPosition: {x: 0, y: -380}
+  m_SizeDelta: {x: 480, y: 480}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &405019341
 MonoBehaviour:
@@ -1637,6 +1637,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SlotClicker.Core.SlotClickerInitializer
   _config: {fileID: 0}
   _createUIOnStart: 1
+  _enableSoundManager: 1
+  _startMuted: 0
   _enableOrientationManager: 1
   _autoRotationDefault: 1
   _enableResponsiveUI: 1
@@ -2307,8 +2309,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -80}
-  m_SizeDelta: {x: 520, y: 200}
+  m_AnchoredPosition: {x: 0, y: -220}
+  m_SizeDelta: {x: 450, y: 80}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1117399158
 GameObject:
@@ -4255,9 +4257,9 @@ MonoBehaviour:
   _slotPanelSize: {x: 480, y: 480}
   _slotCellSize: 130
   _slotCellSpacing: 145
-  _slotPanelPosition: {x: 0, y: -475}
-  _clickAreaSize: {x: 420, y: 312}
-  _clickAreaPosition: {x: 0, y: -400}
+  _slotPanelPosition: {x: 0, y: -380}
+  _clickAreaSize: {x: 450, y: 80}
+  _clickAreaPosition: {x: 0, y: -220}
   _betButtons:
   - {fileID: 941626354}
   - {fileID: 1370352029}
@@ -4279,6 +4281,47 @@ MonoBehaviour:
   _normalClickColor: {r: 0.2, g: 0.6, b: 0.2, a: 1}
   _criticalColor: {r: 1, g: 0.8, b: 0, a: 1}
   _jackpotColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  _enableClickRipple: 1
+  _clickPulseStrength: 0.08
+  _criticalPulseStrength: 0.16
+  _clickPulseDuration: 0.18
+  _rippleDuration: 0.55
+  _rippleMaxScale: 2.3
+  _rippleColor: {r: 1, g: 0.9, b: 0.4, a: 0.9}
+  _criticalRippleColor: {r: 1, g: 0.55, b: 0.15, a: 1}
+  _clickSfx: {fileID: 0}
+  _criticalClickSfx: {fileID: 0}
+  _clickSfxVolume: 0.7
+  _clickPitchJitter: 0.06
+  _criticalPitch: 1.08
+  _criticalSfxVolumeMultiplier: 1.35
+  _enableCriticalFlash: 1
+  _criticalFlashColor: {r: 1, g: 0.85, b: 0.35, a: 0.6}
+  _criticalFlashDuration: 0.2
+  _enableCriticalShake: 1
+  _criticalShakeDuration: 0.22
+  _criticalShakeStrength: 22
+  _criticalShakeVibrato: 20
+  _criticalShakeRandomness: 70
+  _enableClickParticles: 1
+  _normalParticleCount: 5
+  _criticalParticleCount: 12
+  _particleColor: {r: 1, g: 0.9, b: 0.3, a: 1}
+  _criticalParticleColor: {r: 1, g: 0.6, b: 0.2, a: 1}
+  _particleSpeed: 180
+  _particleLifetime: 0.7
+  _enableIdlePulse: 1
+  _idlePulseScale: 0.04
+  _idlePulseDuration: 1.5
+  _idlePulseGlowColor: {r: 1, g: 0.95, b: 0.7, a: 0.3}
+  _enableHitStop: 1
+  _hitStopDuration: 0.08
+  _hitStopTimeScale: 0.1
+  _enableScreenGlow: 1
+  _criticalScreenGlowColor: {r: 1, g: 0.7, b: 0.2, a: 0.6}
+  _jackpotScreenGlowColor: {r: 1, g: 0.3, b: 0.3, a: 0.8}
+  _screenGlowThickness: 50
+  _screenGlowDuration: 0.5
   _upgradeButton: {fileID: 1595153805}
   _prestigeButton: {fileID: 1684401500}
   _statsText: {fileID: 791868346}

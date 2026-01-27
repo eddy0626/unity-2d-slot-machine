@@ -56,6 +56,44 @@ namespace SlotClicker.UI
         [SerializeField] private float _jackpotPulseIntensity = 0.5f;
         [SerializeField] private float _megaJackpotPulseIntensity = 0.6f;
 
+        [Header("=== Win Feel Booster ===")]
+        [SerializeField] private bool _enableTierFlashBursts = true;
+        [SerializeField] private Color _miniWinFlashColor = new Color(1f, 1f, 1f, 0.14f);
+        [SerializeField] private Color _smallWinFlashColor = new Color(0.4f, 1f, 0.8f, 0.2f);
+        [SerializeField] private Color _bigWinFlashColor = new Color(0.5f, 1f, 0.5f, 0.3f);
+        [SerializeField] private Color _jackpotFlashColor = new Color(1f, 0.9f, 0.4f, 0.55f);
+        [SerializeField] private Color _megaFlashColor = new Color(1f, 0.6f, 0.9f, 0.65f);
+        [SerializeField, Range(1, 8)] private int _bigWinFlashBursts = 3;
+        [SerializeField, Range(2, 12)] private int _jackpotFlashBursts = 6;
+        [SerializeField, Range(4, 16)] private int _megaFlashBursts = 10;
+        [SerializeField, Range(0.06f, 0.25f)] private float _flashBurstDuration = 0.12f;
+        [SerializeField, Range(0.05f, 0.4f)] private float _flashBurstInterval = 0.16f;
+
+        [Header("=== Banner Impact Settings ===")]
+        [SerializeField, Range(0.15f, 0.8f)] private float _bannerPunchDuration = 0.42f;
+        [SerializeField, Range(0.05f, 0.35f)] private float _miniBannerPunchScale = 0.12f;
+        [SerializeField, Range(0.08f, 0.45f)] private float _smallBannerPunchScale = 0.18f;
+        [SerializeField, Range(0.12f, 0.6f)] private float _bigBannerPunchScale = 0.28f;
+        [SerializeField, Range(0.16f, 0.8f)] private float _jackpotBannerPunchScale = 0.36f;
+        [SerializeField, Range(0.2f, 1f)] private float _megaBannerPunchScale = 0.46f;
+        [SerializeField, Range(0f, 45f)] private float _bannerShakeStrength = 22f;
+        [SerializeField, Range(0.1f, 0.8f)] private float _bannerShakeDuration = 0.36f;
+        [SerializeField] private Color _bannerFlashColor = new Color(1f, 1f, 1f, 0.32f);
+        [SerializeField, Range(0.08f, 0.5f)] private float _bannerFlashDuration = 0.26f;
+
+        [Header("=== Coin Burst Settings ===")]
+        [SerializeField] private bool _enableCoinBursts = true;
+        [SerializeField, Range(0, 20)] private int _smallWinCoinBurstCount = 8;
+        [SerializeField, Range(0, 40)] private int _bigWinCoinBurstCount = 18;
+        [SerializeField, Range(0, 80)] private int _jackpotCoinBurstCount = 36;
+        [SerializeField, Range(0, 120)] private int _megaCoinBurstCount = 70;
+        [SerializeField, Range(180f, 900f)] private float _coinBurstSpeed = 520f;
+        [SerializeField, Range(0.7f, 2.5f)] private float _coinBurstLifetime = 1.35f;
+        [SerializeField, Range(200f, 1400f)] private float _coinBurstGravity = 880f;
+        [SerializeField, Range(0.5f, 2.2f)] private float _coinBurstSpread = 1.25f;
+        [SerializeField, Range(0.6f, 2.5f)] private float _coinBurstScale = 1.15f;
+        [SerializeField, Range(0.12f, 1.2f)] private float _coinBurstWaveInterval = 0.35f;
+
         #endregion
 
         #region Private Fields
@@ -65,11 +103,16 @@ namespace SlotClicker.UI
 
         // Win Banner UI
         private GameObject _winBanner;
+        private RectTransform _winBannerRect;
         private TextMeshProUGUI _winTitleText;
         private TextMeshProUGUI _winAmountText;
         private Image _winBannerBg;
         private Image _winBannerGlow;
         private CanvasGroup _winBannerGroup;
+        private Tween _bannerPulseTween;
+        private Tween _bannerShakeTween;
+        private Tween _bannerFlashTween;
+        private Vector2 _bannerBaseAnchoredPosition;
 
         // Screen Effects
         private Image _screenFlash;
@@ -93,6 +136,7 @@ namespace SlotClicker.UI
         private Sequence _currentWinSequence;
         private Tween _countupTween;
         private Coroutine _megaJackpotCoroutine;
+        private readonly List<Tween> _scheduledDelays = new List<Tween>();
 
         // Symbol References
         private Image[] _reelSymbols;
@@ -155,6 +199,8 @@ namespace SlotClicker.UI
             bannerRect.anchorMax = new Vector2(0.5f, 0.5f);
             bannerRect.sizeDelta = new Vector2(700, 250);
             bannerRect.anchoredPosition = new Vector2(0, 100);
+            _winBannerRect = bannerRect;
+            _bannerBaseAnchoredPosition = bannerRect.anchoredPosition;
 
             _winBannerGroup = _winBanner.AddComponent<CanvasGroup>();
             _winBannerGroup.alpha = 0;
@@ -409,13 +455,262 @@ namespace SlotClicker.UI
             SoundManager.Instance.PlaySlotResultSound(outcome);
         }
 
+        #region Feel Helpers
+
+        private void TrackScheduledDelay(Tween tween)
+        {
+            if (tween == null) return;
+            _scheduledDelays.Add(tween);
+            tween.onKill += () => _scheduledDelays.Remove(tween);
+            tween.onComplete += () => _scheduledDelays.Remove(tween);
+        }
+
+        private void ClearScheduledDelays()
+        {
+            for (int i = _scheduledDelays.Count - 1; i >= 0; i--)
+            {
+                Tween tween = _scheduledDelays[i];
+                if (tween != null && tween.IsActive())
+                {
+                    tween.Kill();
+                }
+            }
+            _scheduledDelays.Clear();
+        }
+
+        private void PlayTierFlashBursts(SlotOutcome outcome)
+        {
+            if (!_enableTierFlashBursts) return;
+
+            Color flashColor = outcome switch
+            {
+                SlotOutcome.MiniWin => _miniWinFlashColor,
+                SlotOutcome.SmallWin => _smallWinFlashColor,
+                SlotOutcome.BigWin => _bigWinFlashColor,
+                SlotOutcome.Jackpot => _jackpotFlashColor,
+                SlotOutcome.MegaJackpot => _megaFlashColor,
+                _ => _miniWinFlashColor
+            };
+
+            int bursts = outcome switch
+            {
+                SlotOutcome.MiniWin => 1,
+                SlotOutcome.SmallWin => 2,
+                SlotOutcome.BigWin => _bigWinFlashBursts,
+                SlotOutcome.Jackpot => _jackpotFlashBursts,
+                SlotOutcome.MegaJackpot => _megaFlashBursts,
+                _ => 1
+            };
+
+            float duration = Mathf.Max(0.04f, _flashBurstDuration);
+
+            for (int i = 0; i < bursts; i++)
+            {
+                float delay = i * _flashBurstInterval;
+                Tween delayTween = DOVirtual.DelayedCall(delay, () =>
+                {
+                    PlayScreenFlash(flashColor, duration);
+                }, true);
+                TrackScheduledDelay(delayTween);
+            }
+        }
+
+        private float GetBannerPunchScale(SlotOutcome outcome)
+        {
+            return outcome switch
+            {
+                SlotOutcome.MiniWin => _miniBannerPunchScale,
+                SlotOutcome.SmallWin => _smallBannerPunchScale,
+                SlotOutcome.BigWin => _bigBannerPunchScale,
+                SlotOutcome.Jackpot => _jackpotBannerPunchScale,
+                SlotOutcome.MegaJackpot => _megaBannerPunchScale,
+                _ => _miniBannerPunchScale
+            };
+        }
+
+        private void PlayBannerImpact(SlotOutcome outcome, Color accentColor, Color glowColor)
+        {
+            if (_winBanner == null || _winBannerRect == null) return;
+
+            float punchScale = Mathf.Max(0.05f, GetBannerPunchScale(outcome));
+
+            _winBanner.transform.DOKill();
+            _winBanner.transform.localScale = Vector3.one;
+            _winBanner.transform
+                .DOPunchScale(Vector3.one * punchScale, _bannerPunchDuration, 12, 0.9f)
+                .SetEase(Ease.OutQuad)
+                .SetUpdate(true);
+
+            _bannerShakeTween?.Kill();
+            _bannerShakeTween = _winBannerRect
+                .DOShakeAnchorPos(_bannerShakeDuration, _bannerShakeStrength * punchScale, 16, 90f, false, true)
+                .SetEase(Ease.OutQuad)
+                .SetUpdate(true)
+                .OnComplete(() =>
+                {
+                    if (_winBannerRect != null)
+                    {
+                        _winBannerRect.anchoredPosition = _bannerBaseAnchoredPosition;
+                    }
+                });
+
+            if (_winBannerBg != null)
+            {
+                _winBannerBg.DOKill();
+                Color baseColor = new Color(0.1f, 0.08f, 0.15f, 0.95f);
+                Color flashColor = Color.Lerp(baseColor, accentColor, 0.55f);
+                flashColor.a = baseColor.a;
+
+                Sequence bgSeq = DOTween.Sequence().SetUpdate(true);
+                bgSeq.Append(_winBannerBg.DOColor(flashColor, _bannerFlashDuration * 0.4f));
+                bgSeq.Append(_winBannerBg.DOColor(baseColor, _bannerFlashDuration * 0.6f));
+            }
+
+            if (_winBannerGlow != null)
+            {
+                _bannerFlashTween?.Kill();
+                _winBannerGlow.DOKill();
+                Color glowFlash = new Color(glowColor.r, glowColor.g, glowColor.b, Mathf.Max(glowColor.a, _bannerFlashColor.a));
+                _winBannerGlow.color = glowFlash;
+                _bannerFlashTween = _winBannerGlow
+                    .DOFade(glowColor.a, _bannerFlashDuration)
+                    .SetEase(Ease.OutQuad)
+                    .SetUpdate(true);
+            }
+        }
+
+        private int GetCoinBurstCount(SlotOutcome outcome)
+        {
+            return outcome switch
+            {
+                SlotOutcome.SmallWin => _smallWinCoinBurstCount,
+                SlotOutcome.BigWin => _bigWinCoinBurstCount,
+                SlotOutcome.Jackpot => _jackpotCoinBurstCount,
+                SlotOutcome.MegaJackpot => _megaCoinBurstCount,
+                _ => 0
+            };
+        }
+
+        private int GetCoinBurstWaves(SlotOutcome outcome)
+        {
+            return outcome switch
+            {
+                SlotOutcome.SmallWin => 1,
+                SlotOutcome.BigWin => 2,
+                SlotOutcome.Jackpot => 3,
+                SlotOutcome.MegaJackpot => 4,
+                _ => 0
+            };
+        }
+
+        private void PlayCoinBurstWaves(SlotOutcome outcome, Color coinColor)
+        {
+            if (!_enableCoinBursts) return;
+            if (_coinSprite == null) return;
+
+            int totalCount = GetCoinBurstCount(outcome);
+            int waves = GetCoinBurstWaves(outcome);
+
+            if (totalCount <= 0 || waves <= 0) return;
+
+            int perWave = Mathf.Max(1, Mathf.CeilToInt(totalCount / (float)waves));
+
+            for (int i = 0; i < waves; i++)
+            {
+                float delay = i * _coinBurstWaveInterval;
+                float strengthMultiplier = 1f + (i * 0.12f);
+                Tween delayTween = DOVirtual.DelayedCall(delay, () =>
+                {
+                    SpawnCoinBurst(perWave, coinColor, strengthMultiplier);
+                }, true);
+                TrackScheduledDelay(delayTween);
+            }
+        }
+
+        private void SpawnCoinBurst(int count, Color tint, float strengthMultiplier)
+        {
+            if (_canvasRect == null) return;
+
+            Vector2 origin = _winBannerRect != null
+                ? _winBannerRect.anchoredPosition
+                : Vector2.zero;
+
+            float speed = _coinBurstSpeed * Mathf.Max(0.6f, strengthMultiplier);
+            float lifetime = _coinBurstLifetime * Mathf.Clamp(strengthMultiplier, 0.7f, 1.6f);
+            float gravity = _coinBurstGravity * Mathf.Lerp(0.9f, 1.2f, strengthMultiplier - 1f);
+            float spread = _coinBurstSpread * Mathf.Max(0.8f, strengthMultiplier);
+            float scale = _coinBurstScale * Mathf.Lerp(0.9f, 1.25f, strengthMultiplier - 1f);
+
+            for (int i = 0; i < count; i++)
+            {
+                GameObject coin = GetCoinFromPool();
+                if (coin == null) continue;
+
+                coin.SetActive(true);
+                coin.transform.SetAsLastSibling();
+
+                RectTransform rect = coin.GetComponent<RectTransform>();
+                rect.DOKill();
+
+                Vector2 startOffset = new Vector2(
+                    UnityEngine.Random.Range(-40f, 40f),
+                    UnityEngine.Random.Range(-20f, 20f));
+                Vector2 startPos = origin + startOffset;
+                rect.anchoredPosition = startPos;
+
+                rect.localScale = Vector3.one * UnityEngine.Random.Range(0.7f, 1.25f) * scale;
+                rect.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
+
+                Image img = coin.GetComponent<Image>();
+                if (img != null)
+                {
+                    img.DOKill();
+                    // 코인 원본 색에 틴트를 살짝 섞는다
+                    Color tinted = Color.Lerp(Color.white, tint, 0.25f);
+                    tinted.a = 1f;
+                    img.color = tinted;
+                }
+
+                // 위쪽으로 퍼지는 각도 (대략 35도 ~ 145도)
+                float angleDeg = UnityEngine.Random.Range(35f, 145f);
+                float angleRad = angleDeg * Mathf.Deg2Rad;
+
+                float burstSpeed = speed * UnityEngine.Random.Range(0.75f, 1.25f);
+                float t = lifetime * UnityEngine.Random.Range(0.85f, 1.15f);
+
+                float vx = Mathf.Cos(angleRad) * burstSpeed * spread;
+                float vy = Mathf.Sin(angleRad) * burstSpeed;
+
+                float dx = vx * t;
+                float dy = (vy * t) - (0.5f * gravity * t * t);
+
+                Vector2 targetPos = startPos + new Vector2(dx, dy);
+
+                Sequence seq = DOTween.Sequence().SetUpdate(true);
+                seq.Append(rect.DOAnchorPos(targetPos, t).SetEase(Ease.OutQuad));
+                seq.Join(rect.DORotate(new Vector3(0f, 0f, UnityEngine.Random.Range(-1080f, 1080f)), t, RotateMode.FastBeyond360));
+
+                if (img != null)
+                {
+                    seq.Join(img.DOFade(0f, t * 0.45f).SetDelay(t * 0.55f));
+                }
+
+                seq.OnComplete(() => ReturnCoinToPool(coin));
+            }
+        }
+
+        #endregion
+
         #endregion
 
         #region Mini Win Feedback
 
         private void PlayMiniWinFeedback(SlotResult result, int[] winningReelIndices)
         {
-            _currentWinSequence = DOTween.Sequence();
+            _currentWinSequence = DOTween.Sequence().SetUpdate(true);
+
+            // 가벼운 화면 플래시 버스트
+            PlayTierFlashBursts(SlotOutcome.MiniWin);
 
             // Simple shimmer effect on winning symbols
             HighlightWinningSymbols(winningReelIndices, _miniWinColor, _miniWinPulseIntensity, 3);
@@ -425,7 +720,10 @@ namespace SlotClicker.UI
 
             // Show win banner with countup
             ShowWinBanner("MINI WIN!", result.FinalReward, _miniWinColor, _miniWinGlowColor,
-                _miniWinCountupDuration, 48, 36);
+                _miniWinCountupDuration, 48, 36, SlotOutcome.MiniWin);
+
+            // 미니 승리도 가장자리 반응을 살짝 준다
+            PlayScreenGlow(_miniWinGlowColor, 0.25f, 1);
 
             // Auto hide after delay
             _currentWinSequence.AppendInterval(2f);
@@ -438,7 +736,9 @@ namespace SlotClicker.UI
 
         private void PlaySmallWinFeedback(SlotResult result, int[] winningReelIndices)
         {
-            _currentWinSequence = DOTween.Sequence();
+            _currentWinSequence = DOTween.Sequence().SetUpdate(true);
+
+            PlayTierFlashBursts(SlotOutcome.SmallWin);
 
             // Glow effect on winning symbols
             HighlightWinningSymbols(winningReelIndices, _smallWinColor, _smallWinPulseIntensity, 4);
@@ -446,9 +746,15 @@ namespace SlotClicker.UI
             // Medium particle burst
             SpawnWinParticles(_smallWinParticleCount, _smallWinColor, false);
 
+            // 작은 코인 버스트
+            PlayCoinBurstWaves(SlotOutcome.SmallWin, _smallWinColor);
+
+            // 작은 화면 흔들림으로 손맛 보강
+            PlayScreenShake(_bigWinShakeStrength * 0.35f, 0.22f, 1, 0.1f);
+
             // Show win banner
             ShowWinBanner("SMALL WIN!", result.FinalReward, _smallWinColor, _smallWinGlowColor,
-                _smallWinCountupDuration, 56, 42);
+                _smallWinCountupDuration, 56, 42, SlotOutcome.SmallWin);
 
             // Light screen glow
             PlayScreenGlow(_smallWinGlowColor, 0.4f, 2);
@@ -463,7 +769,9 @@ namespace SlotClicker.UI
 
         private void PlayBigWinFeedback(SlotResult result, int[] winningReelIndices)
         {
-            _currentWinSequence = DOTween.Sequence();
+            _currentWinSequence = DOTween.Sequence().SetUpdate(true);
+
+            PlayTierFlashBursts(SlotOutcome.BigWin);
 
             // Strong glow on winning symbols
             HighlightWinningSymbols(winningReelIndices, _bigWinColor, _bigWinPulseIntensity, 6);
@@ -471,15 +779,18 @@ namespace SlotClicker.UI
             // Large particle burst
             SpawnWinParticles(_bigWinParticleCount, _bigWinColor, true);
 
+            // 코인 버스트 웨이브
+            PlayCoinBurstWaves(SlotOutcome.BigWin, _bigWinColor);
+
             // Screen shake
-            PlayScreenShake(_bigWinShakeStrength, 0.4f);
+            PlayScreenShake(_bigWinShakeStrength, 0.42f, 2, 0.14f);
 
             // Screen glow
             PlayScreenGlow(_bigWinGlowColor, 0.5f, 3);
 
             // Show win banner with bigger text
             ShowWinBanner("BIG WIN!", result.FinalReward, _bigWinColor, _bigWinGlowColor,
-                _bigWinCountupDuration, 64, 48);
+                _bigWinCountupDuration, 64, 48, SlotOutcome.BigWin);
 
             // Haptic feedback
             UIFeedback.TriggerHaptic(UIFeedback.HapticType.Medium);
@@ -494,7 +805,9 @@ namespace SlotClicker.UI
 
         private void PlayJackpotFeedback(SlotResult result, int[] winningReelIndices)
         {
-            _currentWinSequence = DOTween.Sequence();
+            _currentWinSequence = DOTween.Sequence().SetUpdate(true);
+
+            PlayTierFlashBursts(SlotOutcome.Jackpot);
 
             // Intense golden glow on ALL symbols (jackpot highlights multiple paylines)
             HighlightWinningSymbols(winningReelIndices, _jackpotColor, _jackpotPulseIntensity, 8);
@@ -502,8 +815,11 @@ namespace SlotClicker.UI
             // Golden explosion particles
             SpawnWinParticles(_jackpotParticleCount, _jackpotColor, true);
 
+            // 잭팟 코인 버스트 웨이브
+            PlayCoinBurstWaves(SlotOutcome.Jackpot, _jackpotColor);
+
             // Strong screen shake
-            PlayScreenShake(_jackpotShakeStrength, 0.6f);
+            PlayScreenShake(_jackpotShakeStrength, 0.65f, 3, 0.16f);
 
             // Golden screen glow with border
             PlayScreenGlow(_jackpotGlowColor, 0.6f, 5);
@@ -516,7 +832,7 @@ namespace SlotClicker.UI
 
             // Show win banner with large text
             ShowWinBanner("JACKPOT!", result.FinalReward, _jackpotColor, _jackpotGlowColor,
-                _jackpotCountupDuration, 80, 56);
+                _jackpotCountupDuration, 80, 56, SlotOutcome.Jackpot);
 
             // Strong haptic
             UIFeedback.TriggerHaptic(UIFeedback.HapticType.Heavy);
@@ -536,12 +852,15 @@ namespace SlotClicker.UI
 
         private IEnumerator MegaJackpotSequence(SlotResult result, int[] winningReelIndices)
         {
+            PlayTierFlashBursts(SlotOutcome.MegaJackpot);
+
             // Phase 1: Initial flash
             PlayScreenFlash(new Color(1f, 1f, 1f, 0.8f), 0.2f);
-            yield return new WaitForSeconds(0.2f);
+            yield return new WaitForSecondsRealtime(0.2f);
 
             // Phase 2: Rainbow/golden explosion
             HighlightWinningSymbols(winningReelIndices, _megaJackpotColor, _megaJackpotPulseIntensity, 12);
+            PlayCoinBurstWaves(SlotOutcome.MegaJackpot, _megaJackpotColor);
 
             // Phase 3: Massive particle burst in waves
             for (int i = 0; i < 3; i++)
@@ -553,11 +872,11 @@ namespace SlotClicker.UI
                     _ => new Color(1f, 0.3f, 0.8f) // Magenta
                 };
                 SpawnWinParticles(_megaJackpotParticleCount / 3, burstColor, true);
-                yield return new WaitForSeconds(0.3f);
+                yield return new WaitForSecondsRealtime(0.3f);
             }
 
             // Phase 4: Strong screen effects
-            PlayScreenShake(_megaJackpotShakeStrength, 1f);
+            PlayScreenShake(_megaJackpotShakeStrength, 1.1f, 4, 0.18f);
             PlayScreenGlow(_megaJackpotGlowColor, 0.8f, 8);
 
             // Phase 5: Continuous screen flashes
@@ -567,7 +886,7 @@ namespace SlotClicker.UI
                     ? new Color(1f, 0.8f, 0.2f, 0.4f)
                     : new Color(1f, 0.5f, 0.8f, 0.4f);
                 PlayScreenFlash(flashColor, 0.15f);
-                yield return new WaitForSeconds(0.25f);
+                yield return new WaitForSecondsRealtime(0.25f);
             }
 
             // Phase 6: Heavy coin rain
@@ -575,25 +894,30 @@ namespace SlotClicker.UI
 
             // Phase 7: Show mega banner
             ShowWinBanner("MEGA JACKPOT!", result.FinalReward, _megaJackpotColor, _megaJackpotGlowColor,
-                _megaJackpotCountupDuration, 90, 64);
+                _megaJackpotCountupDuration, 90, 64, SlotOutcome.MegaJackpot);
 
             // Phase 8: Continuous particle effects during countup
             float elapsed = 0;
             while (elapsed < _megaJackpotCountupDuration)
             {
                 SpawnWinParticles(10, GetRainbowColor(elapsed * 2f), false);
+                if (elapsed > 0.8f)
+                {
+                    // 카운트업 중간중간 코인 버스트 추가
+                    SpawnCoinBurst(Mathf.Max(10, _megaCoinBurstCount / 6), GetRainbowColor(elapsed * 1.7f), 1.1f);
+                }
                 elapsed += 0.3f;
-                yield return new WaitForSeconds(0.3f);
+                yield return new WaitForSecondsRealtime(0.3f);
             }
 
             // Multiple haptic bursts
             for (int i = 0; i < 3; i++)
             {
                 UIFeedback.TriggerHaptic(UIFeedback.HapticType.Heavy);
-                yield return new WaitForSeconds(0.5f);
+                yield return new WaitForSecondsRealtime(0.5f);
             }
 
-            yield return new WaitForSeconds(2f);
+            yield return new WaitForSecondsRealtime(2f);
             HideWinBanner();
         }
 
@@ -614,9 +938,9 @@ namespace SlotClicker.UI
 
             // Show brief banner
             ShowWinBanner("DRAW", result.FinalReward, Color.gray, new Color(0.5f, 0.5f, 0.5f, 0.3f),
-                0.3f, 48, 36);
+                0.3f, 48, 36, SlotOutcome.Draw);
 
-            DOVirtual.DelayedCall(1.5f, () => HideWinBanner());
+            TrackScheduledDelay(DOVirtual.DelayedCall(1.5f, () => HideWinBanner(), true));
         }
 
         #endregion
@@ -624,12 +948,21 @@ namespace SlotClicker.UI
         #region Win Banner
 
         private void ShowWinBanner(string title, double amount, Color textColor, Color glowColor,
-            float countupDuration, int titleFontSize, int amountFontSize)
+            float countupDuration, int titleFontSize, int amountFontSize, SlotOutcome outcome)
         {
             if (_winBanner == null) return;
 
             _winBanner.SetActive(true);
             _winBanner.transform.SetAsLastSibling();
+
+            _bannerPulseTween?.Kill();
+            _bannerShakeTween?.Kill();
+            _bannerFlashTween?.Kill();
+            _winBanner.transform.DOKill();
+            _winBannerRect?.DOKill();
+            _winBannerGroup?.DOKill();
+            _winBannerBg?.DOKill();
+            _winBannerGlow?.DOKill();
 
             // Setup text
             _winTitleText.text = title;
@@ -647,24 +980,35 @@ namespace SlotClicker.UI
             _winBannerGroup.alpha = 0;
             _winBanner.transform.localScale = Vector3.one * 0.5f;
 
-            Sequence showSeq = DOTween.Sequence();
-            showSeq.Append(_winBannerGroup.DOFade(1f, 0.3f));
-            showSeq.Join(_winBanner.transform.DOScale(1f, 0.4f).SetEase(Ease.OutBack));
-            showSeq.Join(_winBannerGlow.DOFade(glowColor.a, 0.3f));
+            Sequence showSeq = DOTween.Sequence().SetUpdate(true);
+            showSeq.Append(_winBannerGroup.DOFade(1f, 0.28f).SetUpdate(true));
+            showSeq.Join(_winBanner.transform.DOScale(1f, 0.42f).SetEase(Ease.OutBack).SetUpdate(true));
+            showSeq.Join(_winBannerGlow.DOFade(glowColor.a, 0.3f).SetUpdate(true));
+            showSeq.OnComplete(() => PlayBannerImpact(outcome, textColor, glowColor));
 
             // Title pulse animation
             _winTitleText.transform.DOKill();
             _winTitleText.transform.localScale = Vector3.one;
-            _winTitleText.transform.DOPunchScale(Vector3.one * 0.15f, 0.4f, 5, 0.5f);
+            _winTitleText.transform
+                .DOPunchScale(Vector3.one * 0.15f, 0.4f, 5, 0.5f)
+                .SetUpdate(true);
 
             // Glow pulse
-            _winBannerGlow.DOFade(glowColor.a * 0.5f, 0.5f).SetLoops(-1, LoopType.Yoyo).SetEase(Ease.InOutSine);
+            float glowPulseTarget = outcome >= SlotOutcome.BigWin
+                ? Mathf.Clamp(glowColor.a * 0.85f, 0.25f, 0.95f)
+                : Mathf.Clamp(glowColor.a * 0.6f, 0.18f, 0.8f);
+            float glowPulseDuration = outcome >= SlotOutcome.Jackpot ? 0.38f : 0.55f;
+            _bannerPulseTween = _winBannerGlow
+                .DOFade(glowPulseTarget, glowPulseDuration)
+                .SetLoops(-1, LoopType.Yoyo)
+                .SetEase(Ease.InOutSine)
+                .SetUpdate(true);
 
             // Countup animation
-            PlayCountupAnimation(amount, countupDuration);
+            PlayCountupAnimation(amount, countupDuration, outcome, textColor);
         }
 
-        private void PlayCountupAnimation(double finalAmount, float duration)
+        private void PlayCountupAnimation(double finalAmount, float duration, SlotOutcome outcome, Color accentColor)
         {
             _countupTween?.Kill();
 
@@ -677,7 +1021,7 @@ namespace SlotClicker.UI
                 },
                 finalAmount,
                 duration
-            ).SetEase(Ease.OutCubic);
+            ).SetEase(Ease.OutCubic).SetUpdate(true);
 
             // Punch scale during countup for emphasis
             if (duration > 1f)
@@ -686,15 +1030,58 @@ namespace SlotClicker.UI
                 for (int i = 0; i < pulseCount; i++)
                 {
                     float delay = 0.5f * i;
-                    DOVirtual.DelayedCall(delay, () =>
+                    Tween delayTween = DOVirtual.DelayedCall(delay, () =>
                     {
                         if (_winAmountText != null)
                         {
                             _winAmountText.transform.DOKill();
                             _winAmountText.transform.localScale = Vector3.one;
-                            _winAmountText.transform.DOPunchScale(Vector3.one * 0.08f, 0.2f, 3, 0.5f);
+                            _winAmountText.transform
+                                .DOPunchScale(Vector3.one * 0.08f, 0.2f, 3, 0.5f)
+                                .SetUpdate(true);
                         }
-                    });
+                    }, true);
+                    TrackScheduledDelay(delayTween);
+                }
+            }
+
+            // 큰 승리일수록 색상 펄스 + 코인 버스트를 카운트업 중간에 추가
+            if (outcome >= SlotOutcome.BigWin)
+            {
+                int bursts = outcome switch
+                {
+                    SlotOutcome.BigWin => 2,
+                    SlotOutcome.Jackpot => 3,
+                    SlotOutcome.MegaJackpot => 5,
+                    _ => 1
+                };
+
+                for (int i = 1; i <= bursts; i++)
+                {
+                    float t = (i / (float)(bursts + 1)) * duration;
+                    Tween delayTween = DOVirtual.DelayedCall(t, () =>
+                    {
+                        if (_winAmountText != null)
+                        {
+                            _winAmountText.DOKill();
+                            _winAmountText.color = accentColor;
+                            _winAmountText
+                                .DOColor(Color.white, 0.18f)
+                                .SetEase(Ease.OutQuad)
+                                .SetUpdate(true)
+                                .OnComplete(() =>
+                                {
+                                    if (_winAmountText != null)
+                                    {
+                                        _winAmountText.DOColor(accentColor, 0.2f).SetUpdate(true);
+                                    }
+                                });
+                        }
+
+                        // 카운트업 중간에 코인 버스트 추가
+                        SpawnCoinBurst(Mathf.Max(8, GetCoinBurstCount(outcome) / (bursts + 1)), accentColor, 1.05f);
+                    }, true);
+                    TrackScheduledDelay(delayTween);
                 }
             }
         }
@@ -704,15 +1091,22 @@ namespace SlotClicker.UI
             if (_winBanner == null || !_winBanner.activeSelf) return;
 
             _countupTween?.Kill();
+            _bannerPulseTween?.Kill();
+            _bannerShakeTween?.Kill();
+            _bannerFlashTween?.Kill();
             _winBannerGlow.DOKill();
 
-            Sequence hideSeq = DOTween.Sequence();
-            hideSeq.Append(_winBannerGroup.DOFade(0f, 0.3f));
-            hideSeq.Join(_winBanner.transform.DOScale(0.8f, 0.3f));
+            Sequence hideSeq = DOTween.Sequence().SetUpdate(true);
+            hideSeq.Append(_winBannerGroup.DOFade(0f, 0.3f).SetUpdate(true));
+            hideSeq.Join(_winBanner.transform.DOScale(0.8f, 0.3f).SetUpdate(true));
             hideSeq.OnComplete(() =>
             {
                 _winBanner.SetActive(false);
                 _winBanner.transform.localScale = Vector3.one;
+                if (_winBannerRect != null)
+                {
+                    _winBannerRect.anchoredPosition = _bannerBaseAnchoredPosition;
+                }
                 _isShowingFeedback = false;
             });
         }
@@ -740,6 +1134,7 @@ namespace SlotClicker.UI
                     symbolTransform.DOScale(1f + intensity, 0.15f)
                         .SetLoops(pulseCount * 2, LoopType.Yoyo)
                         .SetEase(Ease.InOutSine)
+                        .SetUpdate(true)
                         .OnComplete(() => symbolTransform.localScale = Vector3.one);
                 }
 
@@ -752,6 +1147,7 @@ namespace SlotClicker.UI
                     frame.DOKill();
                     frame.DOColor(highlightColor, 0.12f)
                         .SetLoops(pulseCount * 2, LoopType.Yoyo)
+                        .SetUpdate(true)
                         .OnComplete(() => frame.color = originalColor);
                 }
             }
@@ -761,12 +1157,28 @@ namespace SlotClicker.UI
 
         #region Screen Effects
 
-        private void PlayScreenShake(float strength, float duration)
+        private void PlayScreenShake(float strength, float duration, int bursts = 1, float interval = 0.12f)
         {
             if (_mainCanvas == null) return;
 
-            _mainCanvas.transform.DOKill();
-            _mainCanvas.transform.DOShakePosition(duration, strength, 20, 90, false, true);
+            int burstCount = Mathf.Clamp(bursts, 1, 10);
+            float safeDuration = Mathf.Max(0.05f, duration);
+            float safeInterval = Mathf.Max(0.04f, interval);
+
+            for (int i = 0; i < burstCount; i++)
+            {
+                float delay = i * safeInterval;
+                Tween delayTween = DOVirtual.DelayedCall(delay, () =>
+                {
+                    if (_mainCanvas == null) return;
+                    _mainCanvas.transform.DOKill();
+                    _mainCanvas.transform
+                        .DOShakePosition(safeDuration, strength, 20, 90, false, true)
+                        .SetUpdate(true)
+                        .SetEase(Ease.OutQuad);
+                }, true);
+                TrackScheduledDelay(delayTween);
+            }
         }
 
         private void PlayScreenFlash(Color color, float duration)
@@ -778,7 +1190,11 @@ namespace SlotClicker.UI
             _screenFlash.color = color;
 
             _screenFlash.DOKill();
-            _screenFlash.DOFade(0, duration).OnComplete(() =>
+            _screenFlash
+                .DOFade(0, duration)
+                .SetEase(Ease.OutQuad)
+                .SetUpdate(true)
+                .OnComplete(() =>
             {
                 _screenFlash.gameObject.SetActive(false);
             });
@@ -800,6 +1216,7 @@ namespace SlotClicker.UI
                 edge.DOFade(0f, duration / loops)
                     .SetLoops(loops, LoopType.Yoyo)
                     .SetEase(Ease.InOutSine)
+                    .SetUpdate(true)
                     .OnComplete(() =>
                     {
                         Color c = edge.color;
@@ -856,11 +1273,11 @@ namespace SlotClicker.UI
                 Vector2 targetPos = rect.anchoredPosition + direction * speed * lifetime;
                 targetPos.y -= UnityEngine.Random.Range(50f, 150f); // Gravity
 
-                Sequence seq = DOTween.Sequence();
-                seq.Append(rect.DOAnchorPos(targetPos, lifetime).SetEase(Ease.OutQuad));
-                seq.Join(rect.DOScale(0f, lifetime).SetEase(Ease.InQuad));
-                seq.Join(img.DOFade(0f, lifetime * 0.7f).SetDelay(lifetime * 0.3f));
-                seq.Join(rect.DORotate(new Vector3(0, 0, UnityEngine.Random.Range(-720f, 720f)), lifetime, RotateMode.FastBeyond360));
+                Sequence seq = DOTween.Sequence().SetUpdate(true);
+                seq.Append(rect.DOAnchorPos(targetPos, lifetime).SetEase(Ease.OutQuad).SetUpdate(true));
+                seq.Join(rect.DOScale(0f, lifetime).SetEase(Ease.InQuad).SetUpdate(true));
+                seq.Join(img.DOFade(0f, lifetime * 0.7f).SetDelay(lifetime * 0.3f).SetUpdate(true));
+                seq.Join(rect.DORotate(new Vector3(0, 0, UnityEngine.Random.Range(-720f, 720f)), lifetime, RotateMode.FastBeyond360).SetUpdate(true));
                 seq.OnComplete(() => ReturnParticleToPool(particle));
             }
         }
@@ -902,6 +1319,7 @@ namespace SlotClicker.UI
 
         private void StartCoinRain(int count, float duration)
         {
+            if (count <= 0 || duration <= 0f) return;
             StartCoroutine(CoinRainCoroutine(count, duration));
         }
 
@@ -912,7 +1330,7 @@ namespace SlotClicker.UI
             for (int i = 0; i < count; i++)
             {
                 SpawnCoin();
-                yield return new WaitForSeconds(interval);
+                yield return new WaitForSecondsRealtime(interval);
             }
         }
 
@@ -944,11 +1362,11 @@ namespace SlotClicker.UI
             float fallDuration = UnityEngine.Random.Range(1.5f, 2.5f);
             float horizontalDrift = UnityEngine.Random.Range(-100f, 100f);
 
-            Sequence seq = DOTween.Sequence();
-            seq.Append(rect.DOAnchorPosY(endY, fallDuration).SetEase(Ease.InQuad));
-            seq.Join(rect.DOAnchorPosX(startX + horizontalDrift, fallDuration).SetEase(Ease.InOutSine));
-            seq.Join(rect.DORotate(new Vector3(0, 0, UnityEngine.Random.Range(-1080f, 1080f)), fallDuration, RotateMode.FastBeyond360));
-            seq.Join(img.DOFade(0f, fallDuration * 0.3f).SetDelay(fallDuration * 0.7f));
+            Sequence seq = DOTween.Sequence().SetUpdate(true);
+            seq.Append(rect.DOAnchorPosY(endY, fallDuration).SetEase(Ease.InQuad).SetUpdate(true));
+            seq.Join(rect.DOAnchorPosX(startX + horizontalDrift, fallDuration).SetEase(Ease.InOutSine).SetUpdate(true));
+            seq.Join(rect.DORotate(new Vector3(0, 0, UnityEngine.Random.Range(-1080f, 1080f)), fallDuration, RotateMode.FastBeyond360).SetUpdate(true));
+            seq.Join(img.DOFade(0f, fallDuration * 0.3f).SetDelay(fallDuration * 0.7f).SetUpdate(true));
             seq.OnComplete(() => ReturnCoinToPool(coin));
         }
 
@@ -990,6 +1408,11 @@ namespace SlotClicker.UI
         {
             _currentWinSequence?.Kill();
             _countupTween?.Kill();
+            ClearScheduledDelays();
+
+            _bannerPulseTween?.Kill();
+            _bannerShakeTween?.Kill();
+            _bannerFlashTween?.Kill();
 
             if (_megaJackpotCoroutine != null)
             {
@@ -1049,6 +1472,27 @@ namespace SlotClicker.UI
             foreach (var coin in _activeCoins.ToArray())
             {
                 ReturnCoinToPool(coin);
+            }
+
+            if (_winBanner != null)
+            {
+                _winBanner.transform.DOKill();
+                _winBanner.SetActive(false);
+                _winBanner.transform.localScale = Vector3.one;
+            }
+            if (_winBannerGroup != null)
+            {
+                _winBannerGroup.alpha = 0f;
+            }
+
+            if (_mainCanvas != null)
+            {
+                _mainCanvas.transform.DOKill();
+            }
+
+            if (_winBannerRect != null)
+            {
+                _winBannerRect.anchoredPosition = _bannerBaseAnchoredPosition;
             }
 
             _isShowingFeedback = false;

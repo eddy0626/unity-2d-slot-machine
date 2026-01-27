@@ -360,7 +360,11 @@ namespace SlotClicker.UI
                 PlayButtonFeedback(button.gameObject);
                 if (playSound)
                 {
-                    // TODO: 사운드 재생
+                    // ★ 버튼 클릭 사운드 재생
+                    if (SlotClicker.Core.SoundManager.Instance != null)
+                    {
+                        SlotClicker.Core.SoundManager.Instance.PlaySFX(SlotClicker.Core.SoundType.UIButtonClick);
+                    }
                 }
             });
         }
@@ -375,6 +379,16 @@ namespace SlotClicker.UI
             obj.transform.DOKill();
             obj.transform.localScale = Vector3.one;
             obj.transform.DOPunchScale(Vector3.one * 0.08f, 0.15f, 5, 0.5f);
+
+            // ★ 버튼 색상 플래시 효과
+            Image buttonImage = obj.GetComponent<Image>();
+            if (buttonImage != null)
+            {
+                buttonImage.DOKill();
+                Color originalColor = buttonImage.color;
+                buttonImage.DOColor(originalColor * 1.3f, 0.08f)
+                    .OnComplete(() => buttonImage.DOColor(originalColor, 0.12f));
+            }
 
             // 햅틱 피드백 (모바일)
             TriggerHaptic();
