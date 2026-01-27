@@ -35,7 +35,7 @@ namespace SlotClicker.Data
         public float[] betPercentages = { 0.1f, 0.3f, 0.5f, 1f };
         public double minimumBet = 10;
         public double maximumBet = 1000000000; // 최대 베팅 제한 (10억)
-        [Range(0.1f, 1f)] public float maxBetPercentage = 0.5f; // 잔액의 최대 50%만 베팅 가능
+        [Range(0.1f, 1f)] public float maxBetPercentage = 1f; // 잔액의 최대 100% 베팅 가능 (ALL 배팅 지원)
 
         [Header("=== 연패 보호 ===")]
         public bool enableLossStreakProtection = true;

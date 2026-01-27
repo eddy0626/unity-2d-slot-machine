@@ -354,22 +354,24 @@ namespace SlotClicker.UI
             itemLE.minHeight = 100;
             itemLE.preferredHeight = 100;
 
-            // 정보 영역
-            GameObject infoArea = CreateInfoArea(itemObj.transform, info);
+            // 정보 영역 (텍스트 참조도 반환)
+            Text nameText, effectText;
+            GameObject infoArea = CreateInfoArea(itemObj.transform, info, out nameText, out effectText);
 
-            // 구매 버튼
-            Button buyButton = CreateBuyButton(itemObj.transform, info);
+            // 구매 버튼 (비용 텍스트 참조도 반환)
+            Text costText;
+            Button buyButton = CreateBuyButton(itemObj.transform, info, out costText);
 
-            // 컴포넌트 추가
+            // 컴포넌트 추가 (모든 텍스트 참조 전달)
             UpgradeItemUI itemUI = itemObj.AddComponent<UpgradeItemUI>();
-            itemUI.Initialize(info, buyButton, infoArea.GetComponentInChildren<Text>(),
+            itemUI.Initialize(info, buyButton, nameText, effectText, costText,
                 () => _upgradeManager.TryPurchase(info.Data.id),
                 _upgradeManager);
 
             return itemUI;
         }
 
-        private GameObject CreateInfoArea(Transform parent, UpgradeInfo info)
+        private GameObject CreateInfoArea(Transform parent, UpgradeInfo info, out Text nameTextOut, out Text effectTextOut)
         {
             GameObject infoObj = new GameObject("Info");
             infoObj.transform.SetParent(parent);
@@ -396,6 +398,7 @@ namespace SlotClicker.UI
             nameText.fontSize = 24;
             nameText.fontStyle = FontStyle.Bold;
             nameText.color = Color.white;
+            nameTextOut = nameText;
 
             // 설명
             GameObject descObj = new GameObject("Description");
@@ -416,11 +419,12 @@ namespace SlotClicker.UI
             effectText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             effectText.fontSize = 20;
             effectText.color = new Color(0.4f, 0.8f, 0.4f);
+            effectTextOut = effectText;
 
             return infoObj;
         }
 
-        private Button CreateBuyButton(Transform parent, UpgradeInfo info)
+        private Button CreateBuyButton(Transform parent, UpgradeInfo info, out Text costTextOut)
         {
             GameObject btnObj = new GameObject("BuyButton");
             btnObj.transform.SetParent(parent);
@@ -462,6 +466,7 @@ namespace SlotClicker.UI
             text.fontStyle = FontStyle.Bold;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
+            costTextOut = text;
 
             return btn;
         }
@@ -469,8 +474,42 @@ namespace SlotClicker.UI
         private void RefreshUI()
         {
             if (!_isInitialized) return;
-            PopulateUpgrades();
+
+            // 기존 아이템이 있으면 값만 업데이트 (재생성 방지 - GC 최적화)
+            if (_upgradeItems.Count > 0 && _upgradeManager != null)
+            {
+                UpdateExistingItems();
+            }
+            else
+            {
+                PopulateUpgrades();
+            }
+
             UpdateTabVisuals();
+        }
+
+        /// <summary>
+        /// 기존 아이템의 값만 업데이트 (재생성 없이)
+        /// </summary>
+        private void UpdateExistingItems()
+        {
+            List<UpgradeInfo> upgrades = _upgradeManager.GetAllUpgradeInfo(_currentCategory);
+
+            // 아이템 수가 다르면 재생성 필요
+            if (_upgradeItems.Count != upgrades.Count)
+            {
+                PopulateUpgrades();
+                return;
+            }
+
+            // 각 아이템의 값만 업데이트
+            for (int i = 0; i < _upgradeItems.Count; i++)
+            {
+                if (_upgradeItems[i] != null && i < upgrades.Count)
+                {
+                    _upgradeItems[i].UpdateDisplay(upgrades[i]);
+                }
+            }
         }
 
         public void Show()
@@ -516,17 +555,26 @@ namespace SlotClicker.UI
     {
         private UpgradeInfo _info;
         private Button _buyButton;
+        private Image _buyButtonBg;
         private Text _nameText;
+        private Text _effectText;
+        private Text _costText;
         private Action _onPurchase;
         private UpgradeManager _upgradeManager;
         private string _upgradeId;
 
-        public void Initialize(UpgradeInfo info, Button buyButton, Text nameText, Action onPurchase,
-            UpgradeManager upgradeManager = null)
+        // 업그레이드 ID 프로퍼티
+        public string UpgradeId => _upgradeId;
+
+        public void Initialize(UpgradeInfo info, Button buyButton, Text nameText, Text effectText, Text costText,
+            Action onPurchase, UpgradeManager upgradeManager = null)
         {
             _info = info;
             _buyButton = buyButton;
+            _buyButtonBg = buyButton?.GetComponent<Image>();
             _nameText = nameText;
+            _effectText = effectText;
+            _costText = costText;
             _onPurchase = onPurchase;
             _upgradeManager = upgradeManager;
             _upgradeId = info.Data.id;
@@ -566,10 +614,51 @@ namespace SlotClicker.UI
             }
         }
 
+        /// <summary>
+        /// UI 값만 업데이트 (재생성 없이)
+        /// </summary>
         public void UpdateDisplay(UpgradeInfo newInfo)
         {
             _info = newInfo;
-            // UI 갱신은 부모에서 재생성으로 처리
+
+            // 이름 + 레벨 업데이트
+            if (_nameText != null)
+            {
+                _nameText.text = $"{_info.Data.name}  Lv.{_info.CurrentLevel}";
+            }
+
+            // 효과 업데이트
+            if (_effectText != null)
+            {
+                _effectText.text = $"효과: {_info.Data.GetEffectDescription(_info.CurrentLevel)}";
+            }
+
+            // 비용/MAX 업데이트
+            if (_costText != null)
+            {
+                _costText.text = _info.IsMaxLevel ? "MAX" : FormatGold(_info.CurrentCost);
+            }
+
+            // 버튼 상태 업데이트
+            if (_buyButton != null)
+            {
+                _buyButton.interactable = _info.CanAfford && !_info.IsMaxLevel;
+            }
+
+            // 버튼 색상 업데이트
+            if (_buyButtonBg != null)
+            {
+                _buyButtonBg.color = _info.CanAfford ? new Color(0.2f, 0.6f, 0.2f) : new Color(0.4f, 0.4f, 0.4f);
+            }
+        }
+
+        private string FormatGold(double amount)
+        {
+            if (amount >= 1_000_000_000_000) return $"{amount / 1_000_000_000_000:F1}T";
+            if (amount >= 1_000_000_000) return $"{amount / 1_000_000_000:F1}B";
+            if (amount >= 1_000_000) return $"{amount / 1_000_000:F1}M";
+            if (amount >= 1_000) return $"{amount / 1_000:F1}K";
+            return amount.ToString("N0");
         }
     }
 }

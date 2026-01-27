@@ -228,11 +228,32 @@ namespace SlotClicker.Core
         }
 
         /// <summary>
-        /// 특정 효과의 배율 가져오기 (1 + value/100)
+        /// 특정 효과의 배율 가져오기
+        /// - ClickPower: 지수적 증가 (레벨당 1.12배 복리)
+        /// - 기타: 선형 증가 (1 + value/100)
         /// </summary>
         public float GetEffectMultiplier(UpgradeEffect effect)
         {
+            // ClickPower는 지수적 증가 적용 (클리커 게임다운 성장감)
+            if (effect == UpgradeEffect.ClickPower)
+            {
+                int clickPowerLevel = GetClickPowerLevel();
+                if (clickPowerLevel <= 0) return 1f;
+
+                // 레벨당 12% 복리 증가: 1.12^level
+                // 레벨 10: 3.1배, 레벨 20: 9.6배, 레벨 50: 289배
+                return (float)Math.Pow(1.12, clickPowerLevel);
+            }
+
             return 1f + (GetEffectValue(effect) / 100f);
+        }
+
+        /// <summary>
+        /// 클릭 파워 업그레이드 레벨 가져오기
+        /// </summary>
+        public int GetClickPowerLevel()
+        {
+            return GetLevel("click_power");
         }
 
         private void NotifyManagers()

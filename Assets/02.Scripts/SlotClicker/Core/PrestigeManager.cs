@@ -115,16 +115,20 @@ namespace SlotClicker.Core
         #region 프레스티지 실행
 
         /// <summary>
-        /// 획득 가능한 칩 수 계산
+        /// 획득 가능한 칩 수 계산 (개선된 공식)
         /// </summary>
         public int CalculateChipsToGain()
         {
-            if (_playerData.totalGoldEarned < 1_000_000)
+            if (_playerData.totalGoldEarned < 500_000) // 50만 골드로 낮춤 (기존 100만)
                 return 0;
 
-            // floor(log10(총 획득 골드) - 5)
-            int chips = Mathf.FloorToInt((float)(Math.Log10(_playerData.totalGoldEarned) - 5));
-            return Mathf.Max(0, chips);
+            // 개선된 공식: floor((log10(총 획득 골드) - 5) * 1.5) + 기본 1칩
+            // 50만: 1칩, 100만: 2칩, 1000만: 4칩, 1억: 6칩, 10억: 8칩
+            double logValue = Math.Log10(_playerData.totalGoldEarned) - 5;
+            int baseChips = Mathf.FloorToInt((float)(logValue * 1.5));
+
+            // 최소 1칩 보장 (50만 이상이면)
+            return Mathf.Max(1, baseChips);
         }
 
         /// <summary>
@@ -225,17 +229,17 @@ namespace SlotClicker.Core
         }
 
         /// <summary>
-        /// VIP 등급 보너스 (기본 보너스 외 추가)
+        /// VIP 등급 보너스 (강화된 보너스)
         /// </summary>
         public float GetVIPBonus()
         {
             return CurrentVIPRank switch
             {
-                VIPRank.Bronze => 0.05f,    // +5%
-                VIPRank.Silver => 0.10f,    // +10%
-                VIPRank.Gold => 0.15f,      // +15%
-                VIPRank.Platinum => 0.25f,  // +25%
-                VIPRank.Diamond => 0.50f,   // +50%
+                VIPRank.Bronze => 0.15f,    // +15% (기존 5%)
+                VIPRank.Silver => 0.35f,    // +35% (기존 10%)
+                VIPRank.Gold => 0.60f,      // +60% (기존 15%)
+                VIPRank.Platinum => 1.00f,  // +100% (기존 25%)
+                VIPRank.Diamond => 2.00f,   // +200% (기존 50%)
                 _ => 0f
             };
         }
@@ -318,11 +322,21 @@ namespace SlotClicker.Core
         #region 전체 보너스 계산
 
         /// <summary>
-        /// 프레스티지 기본 보너스 (칩당 10%)
+        /// 프레스티지 기본 보너스 (칩당 25% + 복리 효과)
+        /// 칩이 많을수록 보너스가 가속됨
         /// </summary>
         public float GetPrestigeBonus()
         {
-            return 1f + (_playerData.chips * 0.1f);
+            int chips = _playerData.chips;
+            if (chips <= 0) return 1f;
+
+            // 기본: 칩당 25% (기존 10% → 25%)
+            float baseBonus = chips * 0.25f;
+
+            // 복리 효과: 칩 10개마다 추가 50% 보너스
+            float compoundBonus = (chips / 10) * 0.5f;
+
+            return 1f + baseBonus + compoundBonus;
         }
 
         /// <summary>

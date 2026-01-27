@@ -18,12 +18,32 @@ namespace SlotClicker.Core
     [System.Serializable]
     public class SlotResult
     {
-        public int[] Symbols; // 릴별 심볼 인덱스
+        public int[] Symbols; // 3x3 그리드 심볼 (9개: 0-2 상단, 3-5 중간, 6-8 하단)
         public SlotOutcome Outcome;
         public double BetAmount;
         public float RewardMultiplier;
         public double FinalReward;
+        public int[] WinningPayline; // 당첨 페이라인 인덱스들
         public bool IsWin => Outcome != SlotOutcome.Loss;
+    }
+
+    /// <summary>
+    /// 3x3 슬롯 페이라인 정의
+    /// </summary>
+    public static class SlotPaylines
+    {
+        // 5개 페이라인 (인덱스 기준)
+        // 0 1 2 (상단)
+        // 3 4 5 (중간)
+        // 6 7 8 (하단)
+        public static readonly int[][] Lines = new int[][]
+        {
+            new int[] { 3, 4, 5 },  // 중간 가로 (메인 라인)
+            new int[] { 0, 1, 2 },  // 상단 가로
+            new int[] { 6, 7, 8 },  // 하단 가로
+            new int[] { 0, 4, 8 },  // 대각선 ↘
+            new int[] { 6, 4, 2 }   // 대각선 ↗
+        };
     }
 
     public class SlotManager : MonoBehaviour
@@ -108,11 +128,18 @@ namespace SlotClicker.Core
 
         private System.Collections.IEnumerator SpinSequence(SlotResult result)
         {
-            // 각 릴 정지 애니메이션
-            for (int i = 0; i < result.Symbols.Length; i++)
+            // 3x3 그리드: 열(column)별로 정지 (왼쪽→오른쪽)
+            // 열 0: 인덱스 0, 3, 6 / 열 1: 인덱스 1, 4, 7 / 열 2: 인덱스 2, 5, 8
+            for (int col = 0; col < 3; col++)
             {
                 yield return new WaitForSeconds(_config.reelStopDelay);
-                OnReelStop?.Invoke(i, result.Symbols[i]);
+
+                // 해당 열의 3개 심볼 동시 정지
+                for (int row = 0; row < 3; row++)
+                {
+                    int idx = row * 3 + col;
+                    OnReelStop?.Invoke(idx, result.Symbols[idx]);
+                }
             }
 
             // 최종 결과 처리
@@ -142,14 +169,15 @@ namespace SlotClicker.Core
         }
 
         /// <summary>
-        /// 슬롯 결과 계산
+        /// 슬롯 결과 계산 (3x3 그리드)
         /// </summary>
         private SlotResult CalculateResult(double betAmount)
         {
             SlotResult result = new SlotResult
             {
                 BetAmount = betAmount,
-                Symbols = new int[_config.reelCount]
+                Symbols = new int[9], // 3x3 = 9개 심볼
+                WinningPayline = Array.Empty<int>()
             };
 
             // 결과 확률 계산 (업그레이드 적용)
@@ -163,8 +191,8 @@ namespace SlotClicker.Core
             float goldBoost = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.GoldBoost);
             result.FinalReward = betAmount * result.RewardMultiplier * goldBoost;
 
-            // 심볼 생성 (결과에 맞게)
-            GenerateSymbols(result);
+            // 심볼 생성 (3x3 결과에 맞게)
+            GenerateSymbols3x3(result);
 
             return result;
         }
@@ -255,61 +283,89 @@ namespace SlotClicker.Core
         }
 
         /// <summary>
-        /// 결과에 맞는 심볼 배열 생성
+        /// 3x3 그리드용 심볼 배열 생성
+        /// 그리드 인덱스: 0 1 2 (상단) / 3 4 5 (중간) / 6 7 8 (하단)
         /// </summary>
-        private void GenerateSymbols(SlotResult result)
+        private void GenerateSymbols3x3(SlotResult result)
         {
             int symbolCount = _config.symbolCount;
+
+            // 먼저 전체 그리드를 랜덤으로 채움
+            for (int i = 0; i < 9; i++)
+            {
+                result.Symbols[i] = UnityEngine.Random.Range(0, symbolCount);
+            }
+
+            // 당첨 페이라인 선택 (결과에 따라)
+            int winPaylineIndex = UnityEngine.Random.Range(0, SlotPaylines.Lines.Length);
+            int[] winLine = SlotPaylines.Lines[winPaylineIndex];
 
             switch (result.Outcome)
             {
                 case SlotOutcome.MegaJackpot:
-                    // 777 (특별 심볼)
-                    int megaSymbol = symbolCount - 1; // 가장 높은 심볼
-                    for (int i = 0; i < result.Symbols.Length; i++)
+                    // 모든 페이라인에 777 (전체 그리드가 동일 심볼)
+                    int megaSymbol = symbolCount - 1;
+                    for (int i = 0; i < 9; i++)
                         result.Symbols[i] = megaSymbol;
+                    result.WinningPayline = new int[] { 0, 1, 2, 3, 4 }; // 모든 라인
                     break;
 
                 case SlotOutcome.Jackpot:
-                    // 같은 심볼 3개
+                    // 2개 이상 페이라인에서 같은 심볼 3개
                     int jackpotSymbol = UnityEngine.Random.Range(symbolCount - 3, symbolCount);
-                    for (int i = 0; i < result.Symbols.Length; i++)
-                        result.Symbols[i] = jackpotSymbol;
+                    // 중간 라인(3,4,5)과 대각선 하나(0,4,8)를 당첨으로
+                    result.Symbols[3] = jackpotSymbol; result.Symbols[4] = jackpotSymbol; result.Symbols[5] = jackpotSymbol;
+                    result.Symbols[0] = jackpotSymbol; result.Symbols[8] = jackpotSymbol;
+                    result.WinningPayline = new int[] { 0, 3 }; // 중간 가로 + 대각선
                     break;
 
                 case SlotOutcome.BigWin:
-                    // 같은 심볼 3개 (낮은 등급)
-                    int bigWinSymbol = UnityEngine.Random.Range(2, symbolCount - 2);
-                    for (int i = 0; i < result.Symbols.Length; i++)
-                        result.Symbols[i] = bigWinSymbol;
+                    // 1개 페이라인에서 같은 심볼 3개 (높은 등급)
+                    int bigWinSymbol = UnityEngine.Random.Range(symbolCount / 2, symbolCount);
+                    foreach (int idx in winLine)
+                        result.Symbols[idx] = bigWinSymbol;
+                    result.WinningPayline = new int[] { winPaylineIndex };
                     break;
 
                 case SlotOutcome.SmallWin:
-                    // 2개 일치 + 1개 다름
-                    int smallWinSymbol = UnityEngine.Random.Range(1, symbolCount);
-                    result.Symbols[0] = smallWinSymbol;
-                    result.Symbols[1] = smallWinSymbol;
-                    result.Symbols[2] = (smallWinSymbol + UnityEngine.Random.Range(1, symbolCount - 1)) % symbolCount;
+                    // 1개 페이라인에서 같은 심볼 3개 (중간 등급)
+                    int smallWinSymbol = UnityEngine.Random.Range(2, symbolCount - 2);
+                    foreach (int idx in winLine)
+                        result.Symbols[idx] = smallWinSymbol;
+                    result.WinningPayline = new int[] { winPaylineIndex };
                     break;
 
                 case SlotOutcome.MiniWin:
                 case SlotOutcome.Draw:
-                    // 2개 일치
-                    int matchSymbol = UnityEngine.Random.Range(0, symbolCount);
-                    int pos = UnityEngine.Random.Range(0, 2);
-                    result.Symbols[pos] = matchSymbol;
-                    result.Symbols[(pos + 1) % 3] = matchSymbol;
-                    result.Symbols[(pos + 2) % 3] = (matchSymbol + UnityEngine.Random.Range(1, symbolCount - 1)) % symbolCount;
+                    // 1개 페이라인에서 같은 심볼 3개 (낮은 등급)
+                    int miniWinSymbol = UnityEngine.Random.Range(0, symbolCount / 2 + 1);
+                    foreach (int idx in winLine)
+                        result.Symbols[idx] = miniWinSymbol;
+                    result.WinningPayline = new int[] { winPaylineIndex };
                     break;
 
                 default: // Loss
-                    // 모두 다른 심볼
-                    result.Symbols[0] = UnityEngine.Random.Range(0, symbolCount);
-                    do { result.Symbols[1] = UnityEngine.Random.Range(0, symbolCount); }
-                    while (result.Symbols[1] == result.Symbols[0]);
-                    do { result.Symbols[2] = UnityEngine.Random.Range(0, symbolCount); }
-                    while (result.Symbols[2] == result.Symbols[0] || result.Symbols[2] == result.Symbols[1]);
+                    // 어떤 페이라인도 3개 일치하지 않도록 보장
+                    EnsureNoWinningPayline(result.Symbols, symbolCount);
+                    result.WinningPayline = Array.Empty<int>();
                     break;
+            }
+        }
+
+        /// <summary>
+        /// 어떤 페이라인도 당첨되지 않도록 심볼 조정
+        /// </summary>
+        private void EnsureNoWinningPayline(int[] symbols, int symbolCount)
+        {
+            foreach (var line in SlotPaylines.Lines)
+            {
+                // 이 라인의 3개가 모두 같은지 체크
+                if (symbols[line[0]] == symbols[line[1]] && symbols[line[1]] == symbols[line[2]])
+                {
+                    // 마지막 심볼을 다르게 변경
+                    int current = symbols[line[2]];
+                    symbols[line[2]] = (current + 1) % symbolCount;
+                }
             }
         }
 

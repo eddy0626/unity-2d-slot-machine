@@ -40,7 +40,7 @@ namespace SlotClicker.UI
         [SerializeField] private Vector2 _slotPanelPosition = new Vector2(0, -475);
 
         [Header("=== 클릭 영역 설정 ===")]
-        [SerializeField] private Vector2 _clickAreaSize = new Vector2(420, 150);
+        [SerializeField] private Vector2 _clickAreaSize = new Vector2(600, 200);
         [SerializeField] private Vector2 _clickAreaPosition = new Vector2(0, -280);
 
         [Header("=== 베팅 UI ===")]
@@ -110,6 +110,33 @@ namespace SlotClicker.UI
         [SerializeField, Range(5f, 60f)] private float _criticalShakeStrength = 22f;
         [SerializeField, Range(8, 40)] private int _criticalShakeVibrato = 20;
         [SerializeField, Range(0f, 90f)] private float _criticalShakeRandomness = 70f;
+
+        [Header("=== 파티클 이펙트 ===")]
+        [SerializeField] private bool _enableClickParticles = true;
+        [SerializeField, Range(3, 15)] private int _normalParticleCount = 5;
+        [SerializeField, Range(8, 30)] private int _criticalParticleCount = 12;
+        [SerializeField] private Color _particleColor = new Color(1f, 0.9f, 0.3f, 1f);
+        [SerializeField] private Color _criticalParticleColor = new Color(1f, 0.6f, 0.2f, 1f);
+        [SerializeField, Range(80f, 300f)] private float _particleSpeed = 180f;
+        [SerializeField, Range(0.3f, 1.2f)] private float _particleLifetime = 0.7f;
+
+        [Header("=== 클릭 영역 펄스 ===")]
+        [SerializeField] private bool _enableIdlePulse = true;
+        [SerializeField, Range(0.02f, 0.1f)] private float _idlePulseScale = 0.04f;
+        [SerializeField, Range(0.8f, 2.5f)] private float _idlePulseDuration = 1.5f;
+        [SerializeField] private Color _idlePulseGlowColor = new Color(1f, 0.95f, 0.7f, 0.3f);
+
+        [Header("=== 히트 스톱 효과 ===")]
+        [SerializeField] private bool _enableHitStop = true;
+        [SerializeField, Range(0.02f, 0.2f)] private float _hitStopDuration = 0.08f;
+        [SerializeField, Range(0f, 0.5f)] private float _hitStopTimeScale = 0.1f;
+
+        [Header("=== 화면 테두리 글로우 ===")]
+        [SerializeField] private bool _enableScreenGlow = true;
+        [SerializeField] private Color _criticalScreenGlowColor = new Color(1f, 0.7f, 0.2f, 0.6f);
+        [SerializeField] private Color _jackpotScreenGlowColor = new Color(1f, 0.3f, 0.3f, 0.8f);
+        [SerializeField, Range(20f, 100f)] private float _screenGlowThickness = 50f;
+        [SerializeField, Range(0.2f, 1f)] private float _screenGlowDuration = 0.5f;
 
         [Header("=== 업그레이드 UI ===")]
         [SerializeField] private Button _upgradeButton;
@@ -181,6 +208,27 @@ namespace SlotClicker.UI
         private Tween _shakeTween;
         private bool _createdCriticalFlash;
 
+        // 파티클 이펙트 풀
+        private GameObject _particlePrefab;
+        private Queue<GameObject> _particlePool = new Queue<GameObject>();
+        private List<GameObject> _activeParticles = new List<GameObject>();
+        private const int PARTICLE_POOL_INITIAL_SIZE = 20;
+        private const int PARTICLE_POOL_MAX_SIZE = 60;
+
+        // 클릭 영역 펄스
+        private Tween _idlePulseTween;
+        private Tween _idleGlowPulseTween;
+        private bool _isIdlePulsing = false;
+
+        // 히트 스톱
+        private Coroutine _hitStopCoroutine;
+        private float _originalTimeScale = 1f;
+
+        // 화면 테두리 글로우
+        private Image[] _screenGlowEdges;
+        private Tween[] _screenGlowTweens;
+        private bool _createdScreenGlow;
+
         // 슬롯 스핀 관련 (3x3 = 9개)
         private Coroutine[] _spinCoroutines = new Coroutine[9];
         private bool[] _isReelSpinning = new bool[9];
@@ -189,6 +237,9 @@ namespace SlotClicker.UI
         private Tween _resultTween;
         private Tween _toastTween;
         private RectTransform _slotAreaRect;
+
+        // 슬롯 승리 피드백 시스템
+        private SlotWinFeedback _slotWinFeedback;
 
         private enum SpinUIState
         {
@@ -235,6 +286,9 @@ namespace SlotClicker.UI
             UpdateStatistics();
             UpdateAutoSpinButton();
             SetSpinState(SpinUIState.Ready);
+
+            // 향상된 피드백 시스템 초기화
+            SetupEnhancedFeedbackSystems();
         }
 
         /// <summary>
@@ -1101,6 +1155,451 @@ namespace SlotClicker.UI
         }
 
         /// <summary>
+        /// 향상된 피드백 시스템 초기화
+        /// </summary>
+        private void SetupEnhancedFeedbackSystems()
+        {
+            // 파티클 이펙트 시스템
+            if (_enableClickParticles)
+            {
+                CreateParticlePrefab();
+            }
+
+            // 화면 테두리 글로우 생성
+            if (_enableScreenGlow)
+            {
+                CreateScreenGlowEdges();
+            }
+
+            // 클릭 영역 아이들 펄스 시작
+            if (_enableIdlePulse)
+            {
+                StartIdlePulse();
+            }
+
+            // 슬롯 승리 피드백 시스템 초기화
+            InitializeSlotWinFeedback();
+        }
+
+        /// <summary>
+        /// 슬롯 승리 피드백 시스템 초기화
+        /// </summary>
+        private void InitializeSlotWinFeedback()
+        {
+            if (_mainCanvas == null) return;
+
+            // SlotWinFeedback 컴포넌트 추가 또는 가져오기
+            _slotWinFeedback = GetComponent<SlotWinFeedback>();
+            if (_slotWinFeedback == null)
+            {
+                _slotWinFeedback = gameObject.AddComponent<SlotWinFeedback>();
+            }
+
+            // 초기화
+            _slotWinFeedback.Initialize(_mainCanvas, _reelSymbols, _reelFrames);
+
+            Debug.Log("[SlotClickerUI] SlotWinFeedback initialized");
+        }
+
+        #region Particle Effects
+
+        /// <summary>
+        /// 파티클 프리팹 생성
+        /// </summary>
+        private void CreateParticlePrefab()
+        {
+            if (_mainCanvas == null || _particlePrefab != null) return;
+
+            _particlePrefab = new GameObject("ParticlePrefab");
+            _particlePrefab.SetActive(false);
+
+            RectTransform rect = _particlePrefab.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(16f, 16f);
+
+            Image img = _particlePrefab.AddComponent<Image>();
+            img.raycastTarget = false;
+            // 단색 파티클로 사용 (스프라이트 불필요)
+            img.color = _particleColor;
+
+            _particlePrefab.transform.SetParent(_mainCanvas.transform, false);
+
+            // 풀 초기화
+            for (int i = 0; i < PARTICLE_POOL_INITIAL_SIZE; i++)
+            {
+                GameObject pooled = Instantiate(_particlePrefab, _mainCanvas.transform);
+                pooled.name = "PooledParticle";
+                pooled.SetActive(false);
+                _particlePool.Enqueue(pooled);
+            }
+        }
+
+        private GameObject GetParticleFromPool()
+        {
+            GameObject obj;
+            if (_particlePool.Count > 0)
+            {
+                obj = _particlePool.Dequeue();
+            }
+            else if (_activeParticles.Count < PARTICLE_POOL_MAX_SIZE)
+            {
+                obj = Instantiate(_particlePrefab, _mainCanvas.transform);
+                obj.name = "PooledParticle";
+            }
+            else
+            {
+                obj = _activeParticles[0];
+                _activeParticles.RemoveAt(0);
+                obj.transform.DOKill();
+            }
+
+            _activeParticles.Add(obj);
+            return obj;
+        }
+
+        private void ReturnParticleToPool(GameObject obj)
+        {
+            if (obj == null) return;
+
+            obj.transform.DOKill();
+            Image img = obj.GetComponent<Image>();
+            if (img != null) img.DOKill();
+
+            obj.SetActive(false);
+            _activeParticles.Remove(obj);
+
+            if (_particlePool.Count < PARTICLE_POOL_MAX_SIZE)
+            {
+                _particlePool.Enqueue(obj);
+            }
+            else
+            {
+                Destroy(obj);
+            }
+        }
+
+        /// <summary>
+        /// 클릭 시 파티클 분출
+        /// </summary>
+        private void SpawnClickParticles(Vector2 position, bool isCritical)
+        {
+            if (!_enableClickParticles || _mainCanvas == null) return;
+
+            int particleCount = isCritical ? _criticalParticleCount : _normalParticleCount;
+            Color baseColor = isCritical ? _criticalParticleColor : _particleColor;
+            float speed = isCritical ? _particleSpeed * 1.4f : _particleSpeed;
+            float lifetime = isCritical ? _particleLifetime * 1.2f : _particleLifetime;
+
+            for (int i = 0; i < particleCount; i++)
+            {
+                GameObject particle = GetParticleFromPool();
+                particle.SetActive(true);
+                particle.transform.SetAsLastSibling();
+
+                RectTransform rect = particle.GetComponent<RectTransform>();
+                rect.anchoredPosition = position;
+                rect.localScale = Vector3.one * UnityEngine.Random.Range(0.6f, 1.2f);
+
+                if (isCritical)
+                {
+                    rect.localScale *= 1.3f;
+                }
+
+                Image img = particle.GetComponent<Image>();
+                // 색상에 약간의 랜덤 변화
+                float hueShift = UnityEngine.Random.Range(-0.1f, 0.1f);
+                Color particleColor = new Color(
+                    Mathf.Clamp01(baseColor.r + hueShift),
+                    Mathf.Clamp01(baseColor.g + hueShift * 0.5f),
+                    baseColor.b,
+                    1f
+                );
+                img.color = particleColor;
+
+                // 방사형 이동 방향 계산
+                float angle = UnityEngine.Random.Range(0f, 360f) * Mathf.Deg2Rad;
+                float distance = speed * lifetime * UnityEngine.Random.Range(0.6f, 1.2f);
+                Vector2 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                Vector2 targetPos = position + direction * distance;
+
+                // 약간의 곡선 효과를 위한 중력 시뮬레이션
+                targetPos.y -= UnityEngine.Random.Range(30f, 80f);
+
+                // 애니메이션
+                float actualLifetime = lifetime * UnityEngine.Random.Range(0.8f, 1.2f);
+
+                Sequence seq = DOTween.Sequence();
+                seq.Append(rect.DOAnchorPos(targetPos, actualLifetime).SetEase(Ease.OutQuad));
+                seq.Join(rect.DOScale(0f, actualLifetime).SetEase(Ease.InQuad));
+                seq.Join(img.DOFade(0f, actualLifetime * 0.8f).SetDelay(actualLifetime * 0.2f));
+
+                // 회전 추가 (크리티컬 시 더 빠르게)
+                float rotationSpeed = isCritical ? 720f : 360f;
+                seq.Join(rect.DORotate(new Vector3(0, 0, rotationSpeed * (UnityEngine.Random.value > 0.5f ? 1 : -1)), actualLifetime, RotateMode.FastBeyond360));
+
+                seq.OnComplete(() => ReturnParticleToPool(particle));
+            }
+        }
+
+        private void CleanupParticlePool()
+        {
+            foreach (var obj in _activeParticles)
+            {
+                if (obj == null) continue;
+                obj.transform.DOKill();
+                var img = obj.GetComponent<Image>();
+                if (img != null) img.DOKill();
+                Destroy(obj);
+            }
+            _activeParticles.Clear();
+
+            while (_particlePool.Count > 0)
+            {
+                var obj = _particlePool.Dequeue();
+                if (obj != null) Destroy(obj);
+            }
+
+            if (_particlePrefab != null)
+                Destroy(_particlePrefab);
+        }
+
+        #endregion
+
+        #region Idle Pulse
+
+        /// <summary>
+        /// 클릭 영역 아이들 펄스 시작
+        /// </summary>
+        private void StartIdlePulse()
+        {
+            if (!_enableIdlePulse || _clickArea == null || _isIdlePulsing) return;
+
+            _isIdlePulsing = true;
+
+            // 스케일 펄스
+            _idlePulseTween?.Kill();
+            _idlePulseTween = _clickArea.transform
+                .DOScale(1f + _idlePulseScale, _idlePulseDuration)
+                .SetLoops(-1, LoopType.Yoyo)
+                .SetEase(Ease.InOutSine);
+
+            // 글로우 펄스 (있는 경우)
+            if (_clickGlowImage != null)
+            {
+                _idleGlowPulseTween?.Kill();
+                _clickGlowImage.color = new Color(_idlePulseGlowColor.r, _idlePulseGlowColor.g, _idlePulseGlowColor.b, 0f);
+                _idleGlowPulseTween = _clickGlowImage
+                    .DOFade(_idlePulseGlowColor.a, _idlePulseDuration)
+                    .SetLoops(-1, LoopType.Yoyo)
+                    .SetEase(Ease.InOutSine);
+            }
+        }
+
+        /// <summary>
+        /// 클릭 영역 아이들 펄스 일시 정지 (클릭 시)
+        /// </summary>
+        private void PauseIdlePulse()
+        {
+            if (!_isIdlePulsing) return;
+
+            _idlePulseTween?.Pause();
+            _idleGlowPulseTween?.Pause();
+
+            // 0.5초 후 재개
+            DOVirtual.DelayedCall(0.5f, () =>
+            {
+                if (_isIdlePulsing)
+                {
+                    _idlePulseTween?.Play();
+                    _idleGlowPulseTween?.Play();
+                }
+            });
+        }
+
+        /// <summary>
+        /// 클릭 영역 아이들 펄스 중지
+        /// </summary>
+        private void StopIdlePulse()
+        {
+            _isIdlePulsing = false;
+            _idlePulseTween?.Kill();
+            _idleGlowPulseTween?.Kill();
+
+            if (_clickArea != null)
+            {
+                _clickArea.transform.DOKill();
+                _clickArea.transform.localScale = Vector3.one;
+            }
+        }
+
+        #endregion
+
+        #region Hit Stop Effect
+
+        /// <summary>
+        /// 히트 스톱 효과 실행 (크리티컬 시)
+        /// </summary>
+        private void PlayHitStop()
+        {
+            if (!_enableHitStop) return;
+
+            if (_hitStopCoroutine != null)
+            {
+                StopCoroutine(_hitStopCoroutine);
+                Time.timeScale = _originalTimeScale;
+            }
+
+            _hitStopCoroutine = StartCoroutine(HitStopCoroutine());
+        }
+
+        private System.Collections.IEnumerator HitStopCoroutine()
+        {
+            _originalTimeScale = Time.timeScale;
+            Time.timeScale = _hitStopTimeScale;
+
+            yield return new WaitForSecondsRealtime(_hitStopDuration);
+
+            // 부드러운 복귀
+            float elapsed = 0f;
+            float recoveryDuration = 0.05f;
+            while (elapsed < recoveryDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                Time.timeScale = Mathf.Lerp(_hitStopTimeScale, _originalTimeScale, elapsed / recoveryDuration);
+                yield return null;
+            }
+
+            Time.timeScale = _originalTimeScale;
+            _hitStopCoroutine = null;
+        }
+
+        #endregion
+
+        #region Screen Edge Glow
+
+        /// <summary>
+        /// 화면 테두리 글로우 생성
+        /// </summary>
+        private void CreateScreenGlowEdges()
+        {
+            if (_mainCanvas == null || _screenGlowEdges != null) return;
+
+            _screenGlowEdges = new Image[4]; // 상, 하, 좌, 우
+            _screenGlowTweens = new Tween[4];
+            _createdScreenGlow = true;
+
+            RectTransform canvasRect = _mainCanvas.GetComponent<RectTransform>();
+
+            // 상단 테두리
+            _screenGlowEdges[0] = CreateGlowEdge(canvasRect, "ScreenGlow_Top",
+                new Vector2(0, 1), new Vector2(1, 1),
+                new Vector2(0, -_screenGlowThickness / 2), new Vector2(0, _screenGlowThickness));
+
+            // 하단 테두리
+            _screenGlowEdges[1] = CreateGlowEdge(canvasRect, "ScreenGlow_Bottom",
+                new Vector2(0, 0), new Vector2(1, 0),
+                new Vector2(0, _screenGlowThickness / 2), new Vector2(0, _screenGlowThickness));
+
+            // 좌측 테두리
+            _screenGlowEdges[2] = CreateGlowEdge(canvasRect, "ScreenGlow_Left",
+                new Vector2(0, 0), new Vector2(0, 1),
+                new Vector2(_screenGlowThickness / 2, 0), new Vector2(_screenGlowThickness, 0));
+
+            // 우측 테두리
+            _screenGlowEdges[3] = CreateGlowEdge(canvasRect, "ScreenGlow_Right",
+                new Vector2(1, 0), new Vector2(1, 1),
+                new Vector2(-_screenGlowThickness / 2, 0), new Vector2(_screenGlowThickness, 0));
+
+            // 초기 상태: 투명
+            foreach (var edge in _screenGlowEdges)
+            {
+                if (edge != null)
+                {
+                    Color c = edge.color;
+                    edge.color = new Color(c.r, c.g, c.b, 0f);
+                }
+            }
+        }
+
+        private Image CreateGlowEdge(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 position, Vector2 size)
+        {
+            GameObject obj = new GameObject(name);
+            obj.transform.SetParent(parent, false);
+
+            RectTransform rect = obj.AddComponent<RectTransform>();
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+
+            Image img = obj.AddComponent<Image>();
+            img.raycastTarget = false;
+            img.color = _criticalScreenGlowColor;
+
+            // 단색 오버레이로 사용 (스프라이트 불필요)
+            img.sprite = null;
+
+            return img;
+        }
+
+        /// <summary>
+        /// 화면 테두리 글로우 효과 실행
+        /// </summary>
+        private void PlayScreenGlow(bool isJackpot = false)
+        {
+            if (!_enableScreenGlow || _screenGlowEdges == null) return;
+
+            Color glowColor = isJackpot ? _jackpotScreenGlowColor : _criticalScreenGlowColor;
+            float duration = isJackpot ? _screenGlowDuration * 1.5f : _screenGlowDuration;
+            int loops = isJackpot ? 4 : 2;
+
+            for (int i = 0; i < _screenGlowEdges.Length; i++)
+            {
+                if (_screenGlowEdges[i] == null) continue;
+
+                _screenGlowTweens[i]?.Kill();
+                _screenGlowEdges[i].transform.SetAsLastSibling();
+                _screenGlowEdges[i].color = glowColor;
+
+                int index = i; // 클로저용
+                _screenGlowTweens[i] = _screenGlowEdges[i]
+                    .DOFade(0f, duration / loops)
+                    .SetLoops(loops, LoopType.Yoyo)
+                    .SetEase(Ease.InOutSine)
+                    .OnComplete(() =>
+                    {
+                        if (_screenGlowEdges[index] != null)
+                        {
+                            Color c = _screenGlowEdges[index].color;
+                            _screenGlowEdges[index].color = new Color(c.r, c.g, c.b, 0f);
+                        }
+                    });
+            }
+        }
+
+        private void CleanupScreenGlow()
+        {
+            if (_screenGlowTweens != null)
+            {
+                for (int i = 0; i < _screenGlowTweens.Length; i++)
+                {
+                    _screenGlowTweens[i]?.Kill();
+                }
+            }
+
+            if (_screenGlowEdges != null && _createdScreenGlow)
+            {
+                foreach (var edge in _screenGlowEdges)
+                {
+                    if (edge != null)
+                        Destroy(edge.gameObject);
+                }
+            }
+            _screenGlowEdges = null;
+        }
+
+        #endregion
+
+        /// <summary>
         /// 클릭 영역의 이미지/글로우 레이어를 확보
         /// </summary>
         private void EnsureClickVisuals()
@@ -1140,11 +1639,8 @@ namespace SlotClicker.UI
             _clickGlowImage.raycastTarget = false;
             _createdClickGlow = true;
 
-            Sprite glowSprite = _clickAreaImage != null && _clickAreaImage.sprite != null
-                ? _clickAreaImage.sprite
-                : Resources.GetBuiltinResource<Sprite>("UI/Skin/Background.psd");
-
-            _clickGlowImage.sprite = glowSprite;
+            // 클릭 영역의 스프라이트가 있으면 사용, 없으면 단색
+            _clickGlowImage.sprite = _clickAreaImage != null ? _clickAreaImage.sprite : null;
             _clickGlowImage.type = _clickAreaImage != null ? _clickAreaImage.type : Image.Type.Sliced;
             _clickGlowImage.color = new Color(_rippleColor.r, _rippleColor.g, _rippleColor.b, 0f);
         }
@@ -1165,7 +1661,7 @@ namespace SlotClicker.UI
 
             Image img = _ripplePrefab.AddComponent<Image>();
             img.raycastTarget = false;
-            img.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+            // 단색 리플로 사용 (스프라이트 불필요)
             img.color = _rippleColor;
 
             _ripplePrefab.transform.SetParent(_mainCanvas.transform, false);
@@ -1299,7 +1795,7 @@ namespace SlotClicker.UI
         }
 
         /// <summary>
-        /// 클릭 사운드 재생 (크리티컬은 더 강하게)
+        /// 클릭 사운드 재생 (크리티컬은 더 강하게, 콤보 피치 스케일링 적용)
         /// </summary>
         private void PlayClickSound(bool isCritical)
         {
@@ -1310,6 +1806,7 @@ namespace SlotClicker.UI
             AudioClip clipToPlay = isCritical && _criticalClickSfx != null ? _criticalClickSfx : _clickSfx;
             if (clipToPlay == null) return;
 
+            // 피치 계산
             float pitch = isCritical
                 ? _criticalPitch
                 : 1f + UnityEngine.Random.Range(-_clickPitchJitter, _clickPitchJitter);
@@ -1350,7 +1847,7 @@ namespace SlotClicker.UI
 
             _criticalFlashImage = flashObj.AddComponent<Image>();
             _criticalFlashImage.raycastTarget = false;
-            _criticalFlashImage.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Background.psd");
+            // 단색 플래시로 사용 (스프라이트 불필요)
             _createdCriticalFlash = true;
             _criticalFlashImage.color = new Color(
                 _criticalFlashColor.r,
@@ -1980,6 +2477,26 @@ namespace SlotClicker.UI
             CleanupFloatingTextPool();
             CleanupRipplePool();
 
+            // 향상된 피드백 시스템 정리
+            CleanupParticlePool();
+            CleanupScreenGlow();
+
+            // 슬롯 승리 피드백 정리
+            if (_slotWinFeedback != null)
+            {
+                _slotWinFeedback.StopAllFeedback();
+            }
+
+            // 아이들 펄스 정리
+            StopIdlePulse();
+
+            // 히트 스톱 정리
+            if (_hitStopCoroutine != null)
+            {
+                StopCoroutine(_hitStopCoroutine);
+                Time.timeScale = _originalTimeScale;
+            }
+
             // 이벤트 구독 해제 (null-safe)
             if (_game != null)
             {
@@ -2179,16 +2696,24 @@ namespace SlotClicker.UI
 
         private void OnClickResult(ClickResult result)
         {
+            // 아이들 펄스 일시 정지
+            PauseIdlePulse();
+
             // 클릭 사운드 + 플로팅 텍스트 + 리플 + 클릭 영역 피드백
             PlayClickSound(result.IsCritical);
             SpawnClickRipple(result.Position, result.IsCritical);
             SpawnFloatingText(result.Position, result.GoldEarned, result.IsCritical);
             PlayClickAreaFeedback(result.IsCritical);
 
+            // 파티클 이펙트
+            SpawnClickParticles(result.Position, result.IsCritical);
+
             if (result.IsCritical)
             {
                 PlayCriticalFlash();
                 PlayCriticalShake();
+                PlayHitStop(); // 히트 스톱 효과
+                PlayScreenGlow(false); // 화면 테두리 글로우
                 UIFeedback.TriggerHaptic(UIFeedback.HapticType.Medium);
             }
         }
@@ -2655,49 +3180,24 @@ namespace SlotClicker.UI
             }
             UpdateStatistics();
 
-            string message;
-            Color color;
-
-            switch (result.Outcome)
-            {
-                case SlotOutcome.MegaJackpot:
-                    message = $"MEGA JACKPOT! +{GoldManager.FormatNumber(result.FinalReward)}";
-                    color = _jackpotColor;
-                    CelebrationEffect();
-                    break;
-                case SlotOutcome.Jackpot:
-                    message = $"JACKPOT! +{GoldManager.FormatNumber(result.FinalReward)}";
-                    color = _jackpotColor;
-                    CelebrationEffect();
-                    break;
-                case SlotOutcome.BigWin:
-                    message = $"BIG WIN! +{GoldManager.FormatNumber(result.FinalReward)}";
-                    color = Color.green;
-                    break;
-                case SlotOutcome.SmallWin:
-                    message = $"Win! +{GoldManager.FormatNumber(result.FinalReward)}";
-                    color = Color.cyan;
-                    break;
-                case SlotOutcome.MiniWin:
-                    message = $"Mini Win! +{GoldManager.FormatNumber(result.FinalReward)}";
-                    color = Color.white;
-                    break;
-                case SlotOutcome.Draw:
-                    message = "Draw - Money Back!";
-                    color = Color.gray;
-                    break;
-                default:
-                    message = "No Match...";
-                    color = Color.gray;
-                    break;
-            }
-
-            ShowResult(message, color);
-
+            // 당첨 릴 인덱스 계산
             int[] highlightIndices = GetWinningReelIndices(result);
-            if (highlightIndices.Length > 0)
+
+            // 슬롯 승리 피드백 시스템 활용 (승리 또는 무승부인 경우)
+            if (_slotWinFeedback != null && result.Outcome != SlotOutcome.Loss)
             {
-                HighlightReels(highlightIndices, color);
+                _slotWinFeedback.PlayWinFeedback(result, highlightIndices);
+            }
+            else
+            {
+                // 패배 시 기본 결과 표시
+                ShowResult("No Match...", Color.gray);
+
+                // 패배 사운드 재생
+                if (SoundManager.Instance != null)
+                {
+                    SoundManager.Instance.PlaySlotResultSound(SlotOutcome.Loss);
+                }
             }
 
             // 잭팟 당첨 시 자동 스핀 중지
@@ -2707,7 +3207,19 @@ namespace SlotClicker.UI
                 ShowToast("JACKPOT! Auto-spin stopped", new Color(1f, 0.8f, 0.2f));
             }
 
-            DOVirtual.DelayedCall(1.2f, () => SetSpinState(SpinUIState.Ready));
+            // 결과에 따른 Ready 상태 복귀 지연 시간 조정
+            float readyDelay = result.Outcome switch
+            {
+                SlotOutcome.MegaJackpot => 6f,
+                SlotOutcome.Jackpot => 4.5f,
+                SlotOutcome.BigWin => 3f,
+                SlotOutcome.SmallWin => 2.5f,
+                SlotOutcome.MiniWin => 2f,
+                SlotOutcome.Draw => 1.5f,
+                _ => 1.2f
+            };
+
+            DOVirtual.DelayedCall(readyDelay, () => SetSpinState(SpinUIState.Ready));
         }
 
         private void ShowResult(string message, Color color)
@@ -2816,6 +3328,22 @@ namespace SlotClicker.UI
 
             // 화면 흔들림
             _mainCanvas.transform.DOShakePosition(0.5f, 30f, 20);
+
+            // 화면 테두리 글로우 (잭팟용)
+            PlayScreenGlow(true);
+
+            // 대량 파티클 분출
+            Vector2 centerPos = Vector2.zero;
+            for (int i = 0; i < 3; i++)
+            {
+                DOVirtual.DelayedCall(i * 0.15f, () =>
+                {
+                    SpawnClickParticles(centerPos + new Vector2(UnityEngine.Random.Range(-100f, 100f), UnityEngine.Random.Range(-50f, 50f)), true);
+                });
+            }
+
+            // 강력한 햅틱
+            UIFeedback.TriggerHaptic(UIFeedback.HapticType.Heavy);
         }
 
         #endregion

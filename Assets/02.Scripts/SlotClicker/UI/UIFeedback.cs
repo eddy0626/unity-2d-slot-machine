@@ -56,6 +56,7 @@ namespace SlotClicker.UI
                 return;
             }
             _instance = this;
+            DontDestroyOnLoad(gameObject);
         }
 
         /// <summary>
