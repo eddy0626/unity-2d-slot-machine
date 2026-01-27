@@ -178,6 +178,10 @@ namespace SlotClicker.Core
         private int _lastScreenWidth;
         private int _lastScreenHeight;
 
+        // ★ 모바일 최적화: 화면 크기 체크 간격 (매 프레임 X)
+        private float _lastScreenCheckTime = 0f;
+        private const float SCREEN_CHECK_INTERVAL = 1f; // 1초마다 체크
+
         #endregion
 
         #region Unity Lifecycle
@@ -229,8 +233,12 @@ namespace SlotClicker.Core
                 ProcessTransitionAnimation();
             }
 
-            // 화면 크기 변경 감지 (외부에서 방향 변경 시)
-            CheckScreenSizeChange();
+            // ★ 모바일 최적화: 화면 크기 변경 감지 (1초마다, 매 프레임 X)
+            if (Time.time - _lastScreenCheckTime >= SCREEN_CHECK_INTERVAL)
+            {
+                _lastScreenCheckTime = Time.time;
+                CheckScreenSizeChange();
+            }
         }
 
         private void OnDestroy()

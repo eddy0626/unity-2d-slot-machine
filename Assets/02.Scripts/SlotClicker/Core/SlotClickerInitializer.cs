@@ -34,6 +34,10 @@ namespace SlotClicker.Core
 
         private void Awake()
         {
+            // ★ 모바일 최적화: 디바이스에 맞는 품질 설정 자동 적용
+            MobileOptimizer.ApplyOptimalQualitySettings();
+            MobileOptimizer.PrewarmWaitCache();
+
             // GameManager 생성
             if (GameManager.Instance == null)
             {

@@ -30,12 +30,12 @@ namespace SlotClicker.UI
         [SerializeField] private Color _jackpotGlowColor = new Color(1f, 0.85f, 0.2f, 0.7f);
         [SerializeField] private Color _megaJackpotGlowColor = new Color(1f, 0.5f, 0.8f, 0.9f);
 
-        [Header("=== Particle Settings ===")]
-        [SerializeField] private int _miniWinParticleCount = 5;
-        [SerializeField] private int _smallWinParticleCount = 12;
-        [SerializeField] private int _bigWinParticleCount = 25;
-        [SerializeField] private int _jackpotParticleCount = 50;
-        [SerializeField] private int _megaJackpotParticleCount = 100;
+        [Header("=== Particle Settings (Mobile Optimized) ===")]
+        [SerializeField] private int _miniWinParticleCount = 3;
+        [SerializeField] private int _smallWinParticleCount = 8;
+        [SerializeField] private int _bigWinParticleCount = 15;
+        [SerializeField] private int _jackpotParticleCount = 25;
+        [SerializeField] private int _megaJackpotParticleCount = 40;
 
         [Header("=== Screen Shake Settings ===")]
         [SerializeField] private float _bigWinShakeStrength = 15f;
@@ -83,10 +83,10 @@ namespace SlotClicker.UI
 
         [Header("=== Coin Burst Settings ===")]
         [SerializeField] private bool _enableCoinBursts = true;
-        [SerializeField, Range(0, 20)] private int _smallWinCoinBurstCount = 8;
-        [SerializeField, Range(0, 40)] private int _bigWinCoinBurstCount = 18;
-        [SerializeField, Range(0, 80)] private int _jackpotCoinBurstCount = 36;
-        [SerializeField, Range(0, 120)] private int _megaCoinBurstCount = 70;
+        [SerializeField, Range(0, 20)] private int _smallWinCoinBurstCount = 5;
+        [SerializeField, Range(0, 40)] private int _bigWinCoinBurstCount = 12;
+        [SerializeField, Range(0, 80)] private int _jackpotCoinBurstCount = 20;
+        [SerializeField, Range(0, 120)] private int _megaCoinBurstCount = 35;
         [SerializeField, Range(180f, 900f)] private float _coinBurstSpeed = 520f;
         [SerializeField, Range(0.7f, 2.5f)] private float _coinBurstLifetime = 1.35f;
         [SerializeField, Range(200f, 1400f)] private float _coinBurstGravity = 880f;
@@ -631,6 +631,9 @@ namespace SlotClicker.UI
         {
             if (_canvasRect == null) return;
 
+            // ★ 모바일 최적화: 디바이스 프로파일에 따라 코인 수 조정
+            count = MobileOptimizer.AdjustParticleCount(count);
+
             Vector2 origin = _winBannerRect != null
                 ? _winBannerRect.anchoredPosition
                 : Vector2.zero;
@@ -856,7 +859,7 @@ namespace SlotClicker.UI
 
             // Phase 1: Initial flash
             PlayScreenFlash(new Color(1f, 1f, 1f, 0.8f), 0.2f);
-            yield return new WaitForSecondsRealtime(0.2f);
+            yield return MobileOptimizer.GetWaitRealtime(0.2f);
 
             // Phase 2: Rainbow/golden explosion
             HighlightWinningSymbols(winningReelIndices, _megaJackpotColor, _megaJackpotPulseIntensity, 12);
@@ -872,7 +875,7 @@ namespace SlotClicker.UI
                     _ => new Color(1f, 0.3f, 0.8f) // Magenta
                 };
                 SpawnWinParticles(_megaJackpotParticleCount / 3, burstColor, true);
-                yield return new WaitForSecondsRealtime(0.3f);
+                yield return MobileOptimizer.GetWaitRealtime(0.3f);
             }
 
             // Phase 4: Strong screen effects
@@ -886,7 +889,7 @@ namespace SlotClicker.UI
                     ? new Color(1f, 0.8f, 0.2f, 0.4f)
                     : new Color(1f, 0.5f, 0.8f, 0.4f);
                 PlayScreenFlash(flashColor, 0.15f);
-                yield return new WaitForSecondsRealtime(0.25f);
+                yield return MobileOptimizer.GetWaitRealtime(0.25f);
             }
 
             // Phase 6: Heavy coin rain
@@ -907,17 +910,17 @@ namespace SlotClicker.UI
                     SpawnCoinBurst(Mathf.Max(10, _megaCoinBurstCount / 6), GetRainbowColor(elapsed * 1.7f), 1.1f);
                 }
                 elapsed += 0.3f;
-                yield return new WaitForSecondsRealtime(0.3f);
+                yield return MobileOptimizer.GetWaitRealtime(0.3f);
             }
 
             // Multiple haptic bursts
             for (int i = 0; i < 3; i++)
             {
                 UIFeedback.TriggerHaptic(UIFeedback.HapticType.Heavy);
-                yield return new WaitForSecondsRealtime(0.5f);
+                yield return MobileOptimizer.GetWaitRealtime(0.5f);
             }
 
-            yield return new WaitForSecondsRealtime(2f);
+            yield return MobileOptimizer.GetWaitRealtime(2f);
             HideWinBanner();
         }
 
@@ -1234,6 +1237,9 @@ namespace SlotClicker.UI
         {
             if (_mainCanvas == null) return;
 
+            // ★ 모바일 최적화: 디바이스 프로파일에 따라 파티클 수 조정
+            count = MobileOptimizer.AdjustParticleCount(count);
+
             Vector2 centerPos = _winBanner != null && _winBanner.activeSelf
                 ? _winBanner.GetComponent<RectTransform>().anchoredPosition
                 : Vector2.zero;
@@ -1330,7 +1336,7 @@ namespace SlotClicker.UI
             for (int i = 0; i < count; i++)
             {
                 SpawnCoin();
-                yield return new WaitForSecondsRealtime(interval);
+                yield return MobileOptimizer.GetWaitRealtime(interval);
             }
         }
 

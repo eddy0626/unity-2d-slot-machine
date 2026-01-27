@@ -183,6 +183,10 @@ namespace SlotClicker.UI
         private double _currentBetAmount = 0;
         private SpinUIState _spinState = SpinUIState.Ready;
 
+        // ★ 모바일 최적화: 클릭 디바운싱
+        private float _lastClickTime = -0.1f;
+        private const float CLICK_MIN_INTERVAL = 0.05f; // 50ms 최소 간격
+
         // 세션 통계
         private int _sessionSpins = 0;
         private int _sessionWins = 0;
@@ -3086,6 +3090,11 @@ namespace SlotClicker.UI
         {
             if (_game == null || _game.Click == null) return;
 
+            // ★ 모바일 최적화: 클릭 디바운싱 (고주사율 디바이스에서 중복 클릭 방지)
+            if (Time.realtimeSinceStartup - _lastClickTime < CLICK_MIN_INTERVAL)
+                return;
+            _lastClickTime = Time.realtimeSinceStartup;
+
             Vector2 screenPos = GetPointerScreenPosition();
             if (screenPos == Vector2.zero && _clickArea != null)
             {
@@ -3449,7 +3458,7 @@ namespace SlotClicker.UI
                 // (OnSlotSpinComplete에서 체크하여 StopAutoSpin 호출)
 
                 // 다음 스핀 전 짧은 딜레이
-                yield return new WaitForSeconds(0.5f);
+                yield return MobileOptimizer.GetWait(0.5f);
             }
 
             if (_autoSpinRemaining <= 0)
@@ -3563,7 +3572,7 @@ namespace SlotClicker.UI
 
             // ★ 열(column)별 시작 딜레이 - 왼쪽부터 시작
             int column = reelIndex % 3;
-            yield return new WaitForSeconds(column * 0.08f);
+            yield return MobileOptimizer.GetWait(column * 0.08f);
 
             // ★ Phase 1: 가속 (0.3초) - 느리게 시작해서 빠르게
             float accelerationDuration = 0.3f;
@@ -3580,7 +3589,7 @@ namespace SlotClicker.UI
                 // 심볼 변경 + 슬라이드 효과
                 SpinReelStep(reelIndex, symbolCount, currentSpeed, true);
 
-                yield return new WaitForSeconds(currentSpeed);
+                yield return MobileOptimizer.GetWait(currentSpeed);
                 accelerationTime += currentSpeed;
             }
 
@@ -3588,7 +3597,7 @@ namespace SlotClicker.UI
             while (reelIndex < _isReelSpinning.Length && _isReelSpinning[reelIndex])
             {
                 SpinReelStep(reelIndex, symbolCount, maxSpeed, false);
-                yield return new WaitForSeconds(maxSpeed);
+                yield return MobileOptimizer.GetWait(maxSpeed);
             }
         }
 
@@ -3712,7 +3721,7 @@ namespace SlotClicker.UI
                 float alpha = 0.85f + (i * 0.05f);
                 _reelSymbols[reelIndex].color = new Color(1f, 1f, 1f, alpha);
 
-                yield return new WaitForSeconds(decelerationSpeeds[i]);
+                yield return MobileOptimizer.GetWait(decelerationSpeeds[i]);
             }
 
             // ★ Phase 2: 최종 심볼 설정 + 바운스 정지

@@ -132,7 +132,7 @@ namespace SlotClicker.Core
             // 열 0: 인덱스 0, 3, 6 / 열 1: 인덱스 1, 4, 7 / 열 2: 인덱스 2, 5, 8
             for (int col = 0; col < 3; col++)
             {
-                yield return new WaitForSeconds(_config.reelStopDelay);
+                yield return MobileOptimizer.GetWait(_config.reelStopDelay);
 
                 // 해당 열의 3개 심볼 동시 정지
                 for (int row = 0; row < 3; row++)
@@ -143,7 +143,7 @@ namespace SlotClicker.Core
             }
 
             // 최종 결과 처리
-            yield return new WaitForSeconds(0.5f);
+            yield return MobileOptimizer.GetWait(0.5f);
 
             // 보상 지급 및 연패 추적
             if (result.Outcome == SlotOutcome.Loss)
