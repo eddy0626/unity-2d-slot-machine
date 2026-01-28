@@ -34,14 +34,18 @@ namespace SlotClicker.UI
         [SerializeField] private TextMeshProUGUI _spinStateText;
 
         [Header("=== 3x3 슬롯 그리드 설정 ===")]
-        [SerializeField] private Vector2 _slotPanelSize = new Vector2(480, 480);
-        [SerializeField] private float _slotCellSize = 130f;
-        [SerializeField] private float _slotCellSpacing = 145f;
-        [SerializeField] private Vector2 _slotPanelPosition = new Vector2(0, -380); // 위로 이동 (클릭 영역과 겹치지 않도록)
+        [SerializeField] private Vector2 _slotPanelSize = new Vector2(192.167f, 192.167f);
+        [SerializeField] private float _slotCellSize = 52.045f;
+        [SerializeField] private float _slotCellSpacing = 58.05f;
+        [SerializeField] private Vector2 _slotPanelPosition = new Vector2(0, -152.132f); // 위로 이동 (클릭 영역과 겹치지 않도록)
+
+        [Header("=== 스핀 프로파일 ===")]
+        [Tooltip("슬롯 스핀 애니메이션 설정. 없으면 기본값 사용")]
+        [SerializeField] private SlotClickerSpinProfile _spinProfile;
 
         [Header("=== 클릭 영역 설정 ===")]
-        [SerializeField] private Vector2 _clickAreaSize = new Vector2(450, 80); // 크기 축소
-        [SerializeField] private Vector2 _clickAreaPosition = new Vector2(0, -220); // 슬롯 아래, 베팅 버튼 위에 배치
+        [SerializeField] private Vector2 _clickAreaSize = new Vector2(180.156f, 32.028f); // 크기 축소
+        [SerializeField] private Vector2 _clickAreaPosition = new Vector2(0, -88.076f); // 슬롯 아래, 베팅 버튼 위에 배치
 
         [Header("=== 베팅 UI ===")]
         [SerializeField] private Button[] _betButtons;
@@ -207,16 +211,25 @@ namespace SlotClicker.UI
         // 클릭 이펙트 풀 (오브젝트 풀링으로 성능 최적화)
         private GameObject _floatingTextPrefab;
         private Queue<GameObject> _floatingTextPool = new Queue<GameObject>();
-        private List<GameObject> _activeFloatingTexts = new List<GameObject>();
+        private HashSet<GameObject> _activeFloatingTexts = new HashSet<GameObject>();
+        private Queue<GameObject> _activeFloatingTextsQueue = new Queue<GameObject>(); // FIFO 순서 유지
         private const int POOL_INITIAL_SIZE = 10;
         private const int POOL_MAX_SIZE = 30;
 
         // 클릭 리플 이펙트 풀
         private GameObject _ripplePrefab;
         private Queue<GameObject> _ripplePool = new Queue<GameObject>();
-        private List<GameObject> _activeRipples = new List<GameObject>();
+        private HashSet<GameObject> _activeRipples = new HashSet<GameObject>();
+        private Queue<GameObject> _activeRipplesQueue = new Queue<GameObject>(); // FIFO 순서 유지
         private const int RIPPLE_POOL_INITIAL_SIZE = 12;
         private const int RIPPLE_POOL_MAX_SIZE = 40;
+
+        // WebGL 성능 최적화
+        private bool _isWebGL = false;
+        private float _lastEffectTime = 0f;
+        private const float EFFECT_THROTTLE_INTERVAL = 0.05f; // 50ms 간격으로 이펙트 제한
+        private int _frameEffectCount = 0;
+        private const int MAX_EFFECTS_PER_FRAME = 3;
 
         // 클릭 영역 시각 피드백
         private RectTransform _clickAreaRect;
@@ -249,7 +262,8 @@ namespace SlotClicker.UI
         // 파티클 이펙트 풀
         private GameObject _particlePrefab;
         private Queue<GameObject> _particlePool = new Queue<GameObject>();
-        private List<GameObject> _activeParticles = new List<GameObject>();
+        private HashSet<GameObject> _activeParticles = new HashSet<GameObject>();
+        private Queue<GameObject> _activeParticlesQueue = new Queue<GameObject>(); // FIFO 순서 유지
         private const int PARTICLE_POOL_INITIAL_SIZE = 20;
         private const int PARTICLE_POOL_MAX_SIZE = 60;
 
@@ -299,6 +313,12 @@ namespace SlotClicker.UI
             StartCoroutine(WaitForGameManager());
         }
 
+        private void LateUpdate()
+        {
+            // 매 프레임 이펙트 카운터 리셋
+            _frameEffectCount = 0;
+        }
+
         private System.Collections.IEnumerator WaitForGameManager()
         {
             // GameManager 초기화 대기
@@ -334,6 +354,33 @@ namespace SlotClicker.UI
 
             // 향상된 피드백 시스템 초기화
             SetupEnhancedFeedbackSystems();
+
+            // WebGL 해상도 수정 컴포넌트 추가
+            SetupWebGLResolutionFix();
+
+            // 첫 실행 시 도움말 자동 표시
+            CheckFirstTimeTutorial();
+        }
+
+        private void CheckFirstTimeTutorial()
+        {
+            // 튜토리얼을 본 적 없거나, 총 스핀이 5회 미만이면 표시
+            bool shouldShowTutorial = _game != null && _game.PlayerData != null &&
+                (!_game.PlayerData.hasSeenTutorial || _game.PlayerData.totalSpins < 5);
+
+            if (shouldShowTutorial)
+            {
+                // 1.5초 후 도움말 표시 (UI 로딩 후)
+                DOVirtual.DelayedCall(1.5f, () =>
+                {
+                    if (_helpPanel != null && !_isHelpVisible)
+                    {
+                        ToggleHelpPanel();
+                        _game.PlayerData.hasSeenTutorial = true;
+                        ShowToast("게임 방법을 확인하세요! 👆", new Color(0.5f, 0.8f, 1f), 3f);
+                    }
+                });
+            }
         }
 
         /// <summary>
@@ -475,9 +522,14 @@ namespace SlotClicker.UI
                 _mainCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 _mainCanvas.sortingOrder = 100;
 
-                canvasObj.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                canvasObj.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1080, 1920);
-                canvasObj.AddComponent<GraphicRaycaster>();
+                var scaler = canvasObj.AddComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(390, 844);  // 기준 해상도 (CanvasScaler가 자동 스케일링)
+                scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+                scaler.matchWidthOrHeight = 0.5f;  // 가로/세로 균형 맞춤
+
+                var raycaster = canvasObj.AddComponent<GraphicRaycaster>();
+                raycaster.blockingMask = LayerMask.GetMask("UI");  // WebGL 호환성
             }
 
             RectTransform canvasRect = _mainCanvas.GetComponent<RectTransform>();
@@ -521,6 +573,12 @@ namespace SlotClicker.UI
             // === 프레스티지 UI ===
             CreatePrestigeUI();
 
+            // === 도움말 버튼 ===
+            CreateHelpButton(canvasRect);
+
+            // === 도움말 UI ===
+            CreateHelpUI();
+
             // === UIFeedback 초기화 ===
             UIFeedback.Instance.SetCanvas(_mainCanvas);
 
@@ -533,40 +591,40 @@ namespace SlotClicker.UI
             GameObject hudPanel = CreatePanel(parent, "TopHUD", new Vector2(0, 1), new Vector2(1, 1),
                 new Vector2(0, 0), new Vector2(0, 0), new Color(0.1f, 0.1f, 0.15f, 0.95f));
             RectTransform hudRect = hudPanel.GetComponent<RectTransform>();
-            hudRect.anchoredPosition = new Vector2(0, -50); // 상단에서 50px
-            hudRect.sizeDelta = new Vector2(0, 100); // 높이 100px
+            hudRect.anchoredPosition = new Vector2(0, -20.017f); // 상단 오프셋
+            hudRect.sizeDelta = new Vector2(0, 40.035f); // HUD 높이
 
             // 골드 표시 (상단 좌측)
             GameObject goldObj = CreateTextObject(hudRect, "GoldText", "GOLD: 0",
-                new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -15), 42);
+                new Vector2(0, 1), new Vector2(0, 1), new Vector2(16.014f, -6.005f), 16.815f);
             _goldText = goldObj.GetComponent<TextMeshProUGUI>();
             _goldText.color = new Color(1f, 0.85f, 0.2f);
             _goldText.alignment = TextAlignmentOptions.Left;
 
             // 칩 표시 (상단 우측)
             GameObject chipsObj = CreateTextObject(hudRect, "ChipsText", "0 Chips",
-                new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -15), 32);
+                new Vector2(1, 1), new Vector2(1, 1), new Vector2(-16.014f, -6.005f), 12.81f);
             _chipsText = chipsObj.GetComponent<TextMeshProUGUI>();
             _chipsText.color = new Color(0.6f, 0.8f, 1f);
             _chipsText.alignment = TextAlignmentOptions.Right;
 
             // 세션 통계 (하단 좌측)
             GameObject statsObj = CreateTextObject(hudRect, "StatsText", "Spins: 0 | Wins: 0",
-                new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 15), 22);
+                new Vector2(0, 0), new Vector2(0, 0), new Vector2(16.014f, 6.005f), 8.81f);
             _statsText = statsObj.GetComponent<TextMeshProUGUI>();
             _statsText.color = new Color(0.7f, 0.7f, 0.7f);
             _statsText.alignment = TextAlignmentOptions.Left;
 
             // 승률 표시 (하단 중앙)
             GameObject winRateObj = CreateTextObject(hudRect, "WinRateText", "Win Rate: --",
-                new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 15), 22);
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 6.005f), 8.81f);
             _winRateText = winRateObj.GetComponent<TextMeshProUGUI>();
             _winRateText.color = new Color(0.5f, 0.9f, 0.5f);
             _winRateText.alignment = TextAlignmentOptions.Center;
 
             // 프레스티지 진행률 (하단 우측)
             GameObject prestigeObj = CreateTextObject(hudRect, "PrestigeText", "Prestige: 0%",
-                new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 15), 22);
+                new Vector2(1, 0), new Vector2(1, 0), new Vector2(-16.014f, 6.005f), 8.81f);
             _prestigeProgressText = prestigeObj.GetComponent<TextMeshProUGUI>();
             _prestigeProgressText.color = new Color(0.9f, 0.6f, 1f);
             _prestigeProgressText.alignment = TextAlignmentOptions.Right;
@@ -582,7 +640,7 @@ namespace SlotClicker.UI
 
             // 슬롯 프레임
             Image frameImg = slotPanel.GetComponent<Image>();
-            AddOutline(slotPanel, new Color(0.8f, 0.6f, 0.2f), 4);
+            AddOutline(slotPanel, new Color(0.8f, 0.6f, 0.2f), 1.601f);
 
             // 전체 슬롯 영역에 Mask 추가 (WebGL 호환성 - RectMask2D 대신 사용)
             Mask slotMask = slotPanel.AddComponent<Mask>();
@@ -593,7 +651,7 @@ namespace SlotClicker.UI
 
             // 스핀 상태 텍스트 (상단에 배치)
             GameObject stateObj = CreateTextObject(slotRect, "SpinStateText", "READY",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, 30), 28);
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, 12.01f), 11.21f);
             _spinStateText = stateObj.GetComponent<TextMeshProUGUI>();
             _spinStateText.color = new Color(0.8f, 0.8f, 0.9f);
             _spinStateText.alignment = TextAlignmentOptions.Center;
@@ -631,8 +689,8 @@ namespace SlotClicker.UI
                     symRect.anchorMin = Vector2.zero;
                     symRect.anchorMax = Vector2.one;
                     // 마진을 늘려서 애니메이션 시에도 마스크 내부에 유지
-                    symRect.offsetMin = new Vector2(8, 8);
-                    symRect.offsetMax = new Vector2(-8, -8);
+                    symRect.offsetMin = new Vector2(3.203f, 3.203f);
+                    symRect.offsetMax = new Vector2(-3.203f, -3.203f);
 
                     _reelSymbols[idx] = symbolObj.AddComponent<Image>();
                     _reelSymbols[idx].preserveAspect = true;
@@ -684,8 +742,8 @@ namespace SlotClicker.UI
                 clickRect.pivot = new Vector2(0.5f, 0.5f);
 
                 // 위치/크기 강제 적용
-                Vector2 correctPosition = new Vector2(0, -220);  // 슬롯 아래
-                Vector2 correctSize = new Vector2(450, 80);      // 작은 크기
+                Vector2 correctPosition = new Vector2(0, -88.076f);  // 슬롯 아래
+                Vector2 correctSize = new Vector2(180.156f, 32.028f);      // 작은 크기
 
                 clickRect.anchoredPosition = correctPosition;
                 clickRect.sizeDelta = correctSize;
@@ -837,8 +895,8 @@ namespace SlotClicker.UI
             }
 
             // 3x3 그리드 슬롯 패널 새로 생성 (강제로 올바른 위치 적용)
-            Vector2 correctSlotPosition = new Vector2(0, -380);
-            Vector2 correctSlotSize = new Vector2(480, 480);
+            Vector2 correctSlotPosition = new Vector2(0, -152.132f);
+            Vector2 correctSlotSize = new Vector2(192.167f, 192.167f);
             GameObject slotPanel = CreatePanel(canvasRect, "SlotPanel3x3", new Vector2(0.5f, 1), new Vector2(0.5f, 1),
                 correctSlotPosition, correctSlotSize, new Color(0.15f, 0.1f, 0.2f, 1f));
             RectTransform slotRect = slotPanel.GetComponent<RectTransform>();
@@ -864,11 +922,11 @@ namespace SlotClicker.UI
             slotPanel.transform.SetAsLastSibling();
 
             // 슬롯 프레임 아웃라인
-            AddOutline(slotPanel, new Color(0.8f, 0.6f, 0.2f), 4);
+            AddOutline(slotPanel, new Color(0.8f, 0.6f, 0.2f), 1.601f);
 
             // 스핀 상태 텍스트
             GameObject stateObj = CreateTextObject(slotRect, "SpinStateText", "READY",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, 30), 28);
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, 12.01f), 11.21f);
             _spinStateText = stateObj.GetComponent<TextMeshProUGUI>();
             _spinStateText.color = new Color(0.8f, 0.8f, 0.9f);
             _spinStateText.alignment = TextAlignmentOptions.Center;
@@ -947,7 +1005,7 @@ namespace SlotClicker.UI
             else
             {
                 // 기본 스타일: 아웃라인 추가
-                AddOutline(clickPanel, new Color(0.6f, 0.4f, 0.1f), 5);
+                AddOutline(clickPanel, new Color(0.6f, 0.4f, 0.1f), 2.002f);
             }
 
             // 버튼 컴포넌트
@@ -956,7 +1014,7 @@ namespace SlotClicker.UI
 
             // 테이블 텍스트
             GameObject tableText = CreateTextObject(clickRect, "TableText", "TAP TO EARN",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 28); // 축소된 버튼에 맞게 폰트 크기 조정
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 11.21f); // 축소된 버튼에 맞게 폰트 크기 조정
             TextMeshProUGUI tableTmp = tableText.GetComponent<TextMeshProUGUI>();
             tableTmp.color = new Color(1f, 0.9f, 0.6f, 0.8f);
             tableTmp.alignment = TextAlignmentOptions.Center;
@@ -968,25 +1026,25 @@ namespace SlotClicker.UI
 
         private void CreateBettingUI(RectTransform parent)
         {
-            // 베팅 패널 - 하단에 고정
+            // 베팅 패널 - 하단에 고정 (크기 확대)
             GameObject betPanel = CreatePanel(parent, "BetPanel", new Vector2(0, 0), new Vector2(1, 0),
-                new Vector2(0, 0), new Vector2(0, 220), new Color(0.12f, 0.1f, 0.18f, 0.95f));
+                new Vector2(0, 0), new Vector2(0, 104.09f), new Color(0.12f, 0.1f, 0.18f, 0.95f));  // 높이 확대
             RectTransform betRect = betPanel.GetComponent<RectTransform>();
-            betRect.anchoredPosition = new Vector2(0, 110); // 하단에서 110px 위
+            betRect.anchoredPosition = new Vector2(0, 52.045f); // 하단 오프셋
 
             // 현재 베팅액 표시
             GameObject betAmountObj = CreateTextObject(betRect, "BetAmountText", "Bet: 0",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -15), 34);
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -6.005f), 13.612f);
             _betAmountText = betAmountObj.GetComponent<TextMeshProUGUI>();
             _betAmountText.color = Color.white;
             _betAmountText.alignment = TextAlignmentOptions.Center;
 
-            // 베팅 버튼들
+            // 베팅 버튼들 - 크기 확대 및 가로 배치 개선
             _betButtons = new Button[4];
             string[] betLabels = { "10%", "30%", "50%", "ALL" };
             float[] betValues = { 0.1f, 0.3f, 0.5f, 1f };
-            float buttonWidth = 120f;  // 버튼 폭 조정
-            float buttonSpacing = 12f;  // 간격 조정
+            float buttonWidth = 72.062f;  // 버튼 폭
+            float buttonSpacing = 7.687f;  // 간격
             float totalWidth = (buttonWidth * 4) + (buttonSpacing * 3);
             float startX = -totalWidth / 2 + buttonWidth / 2;
 
@@ -997,36 +1055,49 @@ namespace SlotClicker.UI
 
                 GameObject btnObj = CreateButton(betRect, $"BetBtn_{i}", betLabels[i],
                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                    new Vector2(startX + (i * (buttonWidth + buttonSpacing)), 35),
-                    new Vector2(buttonWidth, 45),
+                    new Vector2(startX + (i * (buttonWidth + buttonSpacing)), 14.012f),
+                    new Vector2(buttonWidth, 28.825f),  // 버튼 높이
                     new Color(0.3f, 0.3f, 0.5f));
 
                 _betButtons[i] = btnObj.GetComponent<Button>();
                 _betButtons[i].onClick.AddListener(() => SetBetPercentage(betValue));
+
+                // 버튼 텍스트 크기 확대
+                var btnText = btnObj.GetComponentInChildren<TextMeshProUGUI>();
+                if (btnText != null) btnText.fontSize = 15.372f;
             }
 
-            // 스핀 버튼 - 하단에 배치 (좌측으로 이동)
+            // 스핀 버튼 - 크게 확대하여 하단 중앙에 배치
+            float spinWidth = 124.908f;
+            float autoWidth = 76.867f;
+            float spinAutoHeight = 38.434f;
+            float spinAutoGap = 8.007f;
+            float spinAutoTotal = spinWidth + autoWidth + spinAutoGap;
+            float spinX = -spinAutoTotal / 2f + spinWidth / 2f;
+            float autoX = spinX + spinWidth / 2f + spinAutoGap + autoWidth / 2f;
+            float spinAutoY = 21.201f;
+
             GameObject spinObj = CreateButton(betRect, "SpinButton", "SPIN!",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(-60, 40), new Vector2(180, 60),
+                new Vector2(spinX, spinAutoY), new Vector2(spinWidth, spinAutoHeight),  // 스핀 버튼 크기
                 new Color(0.8f, 0.2f, 0.2f));
             _spinButton = spinObj.GetComponent<Button>();
             _spinButton.onClick.AddListener(OnSpinClicked);
 
             _spinButtonText = spinObj.GetComponentInChildren<TextMeshProUGUI>();
-            _spinButtonText.fontSize = 34;
+            _spinButtonText.fontSize = 20.178f;  // 폰트 크기
             _spinButtonText.fontStyle = FontStyles.Bold;
 
-            // 자동 스핀 버튼 - 스핀 버튼 우측에 배치
-            GameObject autoSpinObj = CreateButton(betRect, "AutoSpinButton", "AUTO\nx10",
+            // 자동 스핀 버튼 - 크게 확대하여 스핀 버튼 우측에 배치
+            GameObject autoSpinObj = CreateButton(betRect, "AutoSpinButton", "AUTO",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(105, 40), new Vector2(90, 60),
+                new Vector2(autoX, spinAutoY), new Vector2(autoWidth, spinAutoHeight),  // 자동 스핀 버튼 크기
                 new Color(0.3f, 0.5f, 0.7f));
             _autoSpinButton = autoSpinObj.GetComponent<Button>();
             _autoSpinButton.onClick.AddListener(OnAutoSpinClicked);
 
             _autoSpinText = autoSpinObj.GetComponentInChildren<TextMeshProUGUI>();
-            _autoSpinText.fontSize = 22;
+            _autoSpinText.fontSize = 15.372f;  // 폰트 크기
             _autoSpinText.fontStyle = FontStyles.Bold;
         }
 
@@ -1037,7 +1108,7 @@ namespace SlotClicker.UI
             // 결과 배너 - 슬롯 영역 하단 고정
             _resultPanel = CreatePanel(resultParent, "ResultPanel",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(0, -30), new Vector2(480, 55),
+                new Vector2(0, -12.01f), new Vector2(192.167f, 22.019f),
                 new Color(0f, 0f, 0f, 0.6f));
 
             RectTransform panelRect = _resultPanel.GetComponent<RectTransform>();
@@ -1047,7 +1118,7 @@ namespace SlotClicker.UI
             _resultGroup.alpha = 0f;
 
             GameObject resultObj = CreateTextObject(panelRect, "ResultText", "",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 44);
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 17.615f);
             _resultText = resultObj.GetComponent<TextMeshProUGUI>();
             _resultText.color = Color.white;
             _resultText.alignment = TextAlignmentOptions.Center;
@@ -1057,7 +1128,7 @@ namespace SlotClicker.UI
         {
             GameObject toastPanel = CreatePanel(parent, "ToastPanel",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(0, 290), new Vector2(480, 45),
+                new Vector2(0, 116.101f), new Vector2(192.167f, 18.015f),
                 new Color(0f, 0f, 0f, 0.6f));
 
             _toastGroup = toastPanel.AddComponent<CanvasGroup>();
@@ -1066,7 +1137,7 @@ namespace SlotClicker.UI
             RectTransform panelRect = toastPanel.GetComponent<RectTransform>();
 
             GameObject toastObj = CreateTextObject(panelRect, "ToastText", "",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 32);
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, 12.81f);
             _toastText = toastObj.GetComponent<TextMeshProUGUI>();
             _toastText.color = Color.white;
             _toastText.alignment = TextAlignmentOptions.Center;
@@ -1078,11 +1149,11 @@ namespace SlotClicker.UI
             _floatingTextPrefab.SetActive(false);
 
             RectTransform rect = _floatingTextPrefab.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(250, 60);
+            rect.sizeDelta = new Vector2(100.087f, 24.021f);
 
             // 가로 레이아웃 그룹 추가 (코인 + 텍스트)
             HorizontalLayoutGroup layout = _floatingTextPrefab.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 8f;
+            layout.spacing = 3.203f;
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = false;
             layout.childControlHeight = false;
@@ -1096,7 +1167,7 @@ namespace SlotClicker.UI
                 coinObj.transform.SetParent(_floatingTextPrefab.transform, false);
 
                 RectTransform coinRect = coinObj.AddComponent<RectTransform>();
-                coinRect.sizeDelta = new Vector2(40, 40);
+                coinRect.sizeDelta = new Vector2(16.014f, 16.014f);
 
                 Image coinImage = coinObj.AddComponent<Image>();
                 coinImage.sprite = _coinSprite;
@@ -1105,8 +1176,8 @@ namespace SlotClicker.UI
 
                 // LayoutElement로 크기 고정
                 LayoutElement coinLayout = coinObj.AddComponent<LayoutElement>();
-                coinLayout.preferredWidth = 40;
-                coinLayout.preferredHeight = 40;
+                coinLayout.preferredWidth = 16.014f;
+                coinLayout.preferredHeight = 16.014f;
             }
 
             // 텍스트 추가
@@ -1114,18 +1185,18 @@ namespace SlotClicker.UI
             textObj.transform.SetParent(_floatingTextPrefab.transform, false);
 
             RectTransform textRect = textObj.AddComponent<RectTransform>();
-            textRect.sizeDelta = new Vector2(180, 50);
+            textRect.sizeDelta = new Vector2(72.062f, 20.017f);
 
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
-            tmp.fontSize = 40;
+            tmp.fontSize = 16.014f;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Left;
             tmp.color = Color.yellow;
 
             // LayoutElement로 텍스트 영역 설정
             LayoutElement textLayout = textObj.AddComponent<LayoutElement>();
-            textLayout.preferredWidth = 180;
-            textLayout.preferredHeight = 50;
+            textLayout.preferredWidth = 72.062f;
+            textLayout.preferredHeight = 20.017f;
 
             // ContentSizeFitter로 전체 크기 자동 조절
             ContentSizeFitter fitter = _floatingTextPrefab.AddComponent<ContentSizeFitter>();
@@ -1174,13 +1245,14 @@ namespace SlotClicker.UI
             }
             else
             {
-                // 풀이 가득 찼으면 가장 오래된 활성 텍스트 재활용
-                obj = _activeFloatingTexts[0];
-                _activeFloatingTexts.RemoveAt(0);
+                // 풀이 가득 찼으면 가장 오래된 활성 텍스트 재활용 (O(1) 큐 사용)
+                obj = _activeFloatingTextsQueue.Dequeue();
+                _activeFloatingTexts.Remove(obj); // HashSet O(1)
                 obj.transform.DOKill();
             }
 
-            _activeFloatingTexts.Add(obj);
+            _activeFloatingTexts.Add(obj); // HashSet O(1)
+            _activeFloatingTextsQueue.Enqueue(obj); // 순서 유지
             return obj;
         }
 
@@ -1193,7 +1265,8 @@ namespace SlotClicker.UI
 
             obj.transform.DOKill();
             obj.SetActive(false);
-            _activeFloatingTexts.Remove(obj);
+            _activeFloatingTexts.Remove(obj); // HashSet O(1)
+            // Note: Queue에서 제거하지 않음 - 순서대로 재활용될 때 자연스럽게 정리됨
 
             if (_floatingTextPool.Count < POOL_MAX_SIZE)
             {
@@ -1219,6 +1292,7 @@ namespace SlotClicker.UI
                 }
             }
             _activeFloatingTexts.Clear();
+            _activeFloatingTextsQueue.Clear();
 
             while (_floatingTextPool.Count > 0)
             {
@@ -1256,6 +1330,17 @@ namespace SlotClicker.UI
         /// </summary>
         private void SetupEnhancedFeedbackSystems()
         {
+            // WebGL 플랫폼 감지 및 성능 최적화
+#if UNITY_WEBGL
+            _isWebGL = true;
+            // WebGL에서 파티클/이펙트 수 감소
+            _normalParticleCount = Mathf.Min(_normalParticleCount, 3);
+            _criticalParticleCount = Mathf.Min(_criticalParticleCount, 5);
+            _streakParticleBonusPerLevel = Mathf.Min(_streakParticleBonusPerLevel, 1);
+            _streakExtraRipplesPerLevel = Mathf.Min(_streakExtraRipplesPerLevel, 0);
+            Debug.Log("[SlotClickerUI] WebGL detected - reduced particle counts for performance");
+#endif
+
             // 파티클 이펙트 시스템
             if (_enableClickParticles)
             {
@@ -1296,6 +1381,24 @@ namespace SlotClicker.UI
             _slotWinFeedback.Initialize(_mainCanvas, _reelSymbols, _reelFrames);
 
             Debug.Log("[SlotClickerUI] SlotWinFeedback initialized");
+        }
+
+        /// <summary>
+        /// WebGL 해상도 수정 컴포넌트 설정
+        /// </summary>
+        private void SetupWebGLResolutionFix()
+        {
+#if UNITY_WEBGL
+            // WebGLResolutionFix 컴포넌트 추가
+            var resolutionFix = FindObjectOfType<WebGLResolutionFix>();
+            if (resolutionFix == null)
+            {
+                var fixObj = new GameObject("WebGLResolutionFix");
+                fixObj.AddComponent<WebGLResolutionFix>();
+                DontDestroyOnLoad(fixObj);
+                Debug.Log("[SlotClickerUI] WebGLResolutionFix component added");
+            }
+#endif
         }
 
         #region Click Streak / Overdrive
@@ -1442,7 +1545,7 @@ namespace SlotClicker.UI
             _particlePrefab.SetActive(false);
 
             RectTransform rect = _particlePrefab.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(16f, 16f);
+            rect.sizeDelta = new Vector2(6.406f, 6.406f);
 
             Image img = _particlePrefab.AddComponent<Image>();
             img.raycastTarget = false;
@@ -1475,12 +1578,14 @@ namespace SlotClicker.UI
             }
             else
             {
-                obj = _activeParticles[0];
-                _activeParticles.RemoveAt(0);
+                // 가장 오래된 파티클 재활용 (O(1) 큐 사용)
+                obj = _activeParticlesQueue.Dequeue();
+                _activeParticles.Remove(obj); // HashSet O(1)
                 obj.transform.DOKill();
             }
 
-            _activeParticles.Add(obj);
+            _activeParticles.Add(obj); // HashSet O(1)
+            _activeParticlesQueue.Enqueue(obj); // 순서 유지
             return obj;
         }
 
@@ -1489,11 +1594,14 @@ namespace SlotClicker.UI
             if (obj == null) return;
 
             obj.transform.DOKill();
-            Image img = obj.GetComponent<Image>();
-            if (img != null) img.DOKill();
+            // GetComponent 캐시 대신 TryGetComponent 사용 (더 가벼움)
+            if (obj.TryGetComponent<Image>(out var img))
+            {
+                img.DOKill();
+            }
 
             obj.SetActive(false);
-            _activeParticles.Remove(obj);
+            _activeParticles.Remove(obj); // HashSet O(1)
 
             if (_particlePool.Count < PARTICLE_POOL_MAX_SIZE)
             {
@@ -1591,11 +1699,14 @@ namespace SlotClicker.UI
             {
                 if (obj == null) continue;
                 obj.transform.DOKill();
-                var img = obj.GetComponent<Image>();
-                if (img != null) img.DOKill();
+                if (obj.TryGetComponent<Image>(out var img))
+                {
+                    img.DOKill();
+                }
                 Destroy(obj);
             }
             _activeParticles.Clear();
+            _activeParticlesQueue.Clear();
 
             while (_particlePool.Count > 0)
             {
@@ -1931,7 +2042,7 @@ namespace SlotClicker.UI
             _ripplePrefab.SetActive(false);
 
             RectTransform rect = _ripplePrefab.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(140f, 140f);
+            rect.sizeDelta = new Vector2(56.049f, 56.049f);
 
             Image img = _ripplePrefab.AddComponent<Image>();
             img.raycastTarget = false;
@@ -1973,14 +2084,18 @@ namespace SlotClicker.UI
             }
             else
             {
-                obj = _activeRipples[0];
-                _activeRipples.RemoveAt(0);
+                // 가장 오래된 리플 재활용 (O(1) 큐 사용)
+                obj = _activeRipplesQueue.Dequeue();
+                _activeRipples.Remove(obj); // HashSet O(1)
                 obj.transform.DOKill();
-                Image activeImg = obj.GetComponent<Image>();
-                if (activeImg != null) activeImg.DOKill();
+                if (obj.TryGetComponent<Image>(out var activeImg))
+                {
+                    activeImg.DOKill();
+                }
             }
 
-            _activeRipples.Add(obj);
+            _activeRipples.Add(obj); // HashSet O(1)
+            _activeRipplesQueue.Enqueue(obj); // 순서 유지
             return obj;
         }
 
@@ -1989,11 +2104,13 @@ namespace SlotClicker.UI
             if (obj == null) return;
 
             obj.transform.DOKill();
-            Image img = obj.GetComponent<Image>();
-            if (img != null) img.DOKill();
+            if (obj.TryGetComponent<Image>(out var img))
+            {
+                img.DOKill();
+            }
 
             obj.SetActive(false);
-            _activeRipples.Remove(obj);
+            _activeRipples.Remove(obj); // HashSet O(1)
 
             if (_ripplePool.Count < RIPPLE_POOL_MAX_SIZE)
             {
@@ -2011,19 +2128,24 @@ namespace SlotClicker.UI
             {
                 if (obj == null) continue;
                 obj.transform.DOKill();
-                Image img = obj.GetComponent<Image>();
-                if (img != null) img.DOKill();
+                if (obj.TryGetComponent<Image>(out var img))
+                {
+                    img.DOKill();
+                }
                 Destroy(obj);
             }
             _activeRipples.Clear();
+            _activeRipplesQueue.Clear();
 
             while (_ripplePool.Count > 0)
             {
                 var obj = _ripplePool.Dequeue();
                 if (obj == null) continue;
                 obj.transform.DOKill();
-                Image img = obj.GetComponent<Image>();
-                if (img != null) img.DOKill();
+                if (obj.TryGetComponent<Image>(out var img2))
+                {
+                    img2.DOKill();
+                }
                 Destroy(obj);
             }
 
@@ -2436,7 +2558,7 @@ namespace SlotClicker.UI
         }
 
         private GameObject CreateTextObject(RectTransform parent, string name, string text,
-            Vector2 anchorMin, Vector2 anchorMax, Vector2 position, int fontSize)
+            Vector2 anchorMin, Vector2 anchorMax, Vector2 position, float fontSize)
         {
             GameObject textObj = new GameObject(name);
             textObj.transform.SetParent(parent, false);
@@ -2445,7 +2567,7 @@ namespace SlotClicker.UI
             rect.anchorMin = anchorMin;
             rect.anchorMax = anchorMax;
             rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(400, 60);
+            rect.sizeDelta = new Vector2(160.139f, 24.021f);
 
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = text;
@@ -2467,7 +2589,7 @@ namespace SlotClicker.UI
             btn.colors = colors;
 
             GameObject textObj = CreateTextObject(btnObj.GetComponent<RectTransform>(), "Label", label,
-                Vector2.zero, Vector2.one, Vector2.zero, 30);
+                Vector2.zero, Vector2.one, Vector2.zero, 12.81f);
             RectTransform textRect = textObj.GetComponent<RectTransform>();
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
@@ -2705,7 +2827,7 @@ namespace SlotClicker.UI
             // 업그레이드 버튼 (화면 오른쪽 상단, HUD 바로 아래 - HUD끝 -150 + 10px 간격)
             GameObject btnObj = CreateButton(parent, "UpgradeButton", "UPGRADES",
                 new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-90, -165), new Vector2(140, 45),
+                new Vector2(-36.031f, -66.056f), new Vector2(67.259f, 21.618f),
                 new Color(0.4f, 0.3f, 0.7f));
 
             _upgradeButton = btnObj.GetComponent<Button>();
@@ -2746,7 +2868,7 @@ namespace SlotClicker.UI
             // 프레스티지 버튼 (화면 왼쪽 상단, HUD 바로 아래 - HUD끝 -150 + 10px 간격)
             GameObject btnObj = CreateButton(parent, "PrestigeButton", "PRESTIGE",
                 new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(90, -165), new Vector2(140, 45),
+                new Vector2(36.031f, -66.056f), new Vector2(67.259f, 21.618f),
                 new Color(0.6f, 0.3f, 0.6f));
 
             _prestigeButton = btnObj.GetComponent<Button>();
@@ -2783,6 +2905,228 @@ namespace SlotClicker.UI
             if (_prestigeUI != null)
             {
                 _prestigeUI.Toggle();
+            }
+        }
+
+        #endregion
+
+        #region Help System
+
+        private Button _helpButton;
+        private GameObject _helpPanel;
+        private bool _isHelpVisible = false;
+
+        private void CreateHelpButton(RectTransform parent)
+        {
+            // 도움말 버튼 (하단 베팅 영역 우측에 배치 - 항상 보이도록)
+            GameObject btnObj = CreateButton(parent, "HelpButton", "?",
+                new Vector2(1, 0), new Vector2(1, 0),  // 하단 우측 앵커
+                new Vector2(-16.014f, 72.062f), new Vector2(31.228f, 31.228f),  // 하단에서 위로
+                new Color(0.3f, 0.7f, 0.9f));
+
+            _helpButton = btnObj.GetComponent<Button>();
+            _helpButton.onClick.AddListener(ToggleHelpPanel);
+
+            // 버튼 텍스트 크게
+            var btnText = btnObj.GetComponentInChildren<TextMeshProUGUI>();
+            if (btnText != null)
+            {
+                btnText.fontSize = 19.217f;
+                btnText.fontStyle = FontStyles.Bold;
+            }
+
+            // 눈에 띄게 펄스 애니메이션
+            btnObj.transform.DOScale(1.1f, 0.8f)
+                .SetLoops(-1, LoopType.Yoyo)
+                .SetEase(Ease.InOutSine);
+        }
+
+        private void CreateHelpUI()
+        {
+            // 도움말 패널 (화면 중앙, 큰 팝업)
+            _helpPanel = new GameObject("HelpPanel");
+            _helpPanel.transform.SetParent(_mainCanvas.transform, false);
+
+            RectTransform rect = _helpPanel.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.05f, 0.08f);
+            rect.anchorMax = new Vector2(0.95f, 0.92f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            // 배경
+            Image bg = _helpPanel.AddComponent<Image>();
+            bg.color = new Color(0.08f, 0.06f, 0.12f, 0.98f);
+
+            // 스크롤 가능한 내용을 위한 컨테이너
+            CreateHelpContent(rect);
+
+            _helpPanel.SetActive(false);
+        }
+
+        private void CreateHelpContent(RectTransform parent)
+        {
+            // 제목
+            GameObject titleObj = CreateTextObject(parent, "HelpTitle", "🎰 슬롯 게임 가이드",
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -12.01f), 16.815f);
+            var titleText = titleObj.GetComponent<TextMeshProUGUI>();
+            titleText.color = new Color(1f, 0.85f, 0.3f);
+            titleText.fontStyle = FontStyles.Bold;
+            titleText.alignment = TextAlignmentOptions.Center;
+
+            // 닫기 버튼
+            GameObject closeBtn = CreateButton(parent, "CloseHelp", "X",
+                new Vector2(1, 1), new Vector2(1, 1),
+                new Vector2(-12.01f, -12.01f), new Vector2(24.02f, 24.02f),
+                new Color(0.7f, 0.3f, 0.3f));
+            closeBtn.GetComponent<Button>().onClick.AddListener(ToggleHelpPanel);
+            var closeText = closeBtn.GetComponentInChildren<TextMeshProUGUI>();
+            if (closeText != null) closeText.fontSize = 13.452f;
+
+            // === 페이라인 설명 섹션 ===
+            float yPos = -36.031f;
+
+            CreateHelpSection(parent, "📍 페이라인 (당첨 라인)", ref yPos);
+            CreateHelpText(parent, "3x3 슬롯에서 같은 심볼 3개가 라인에 맞으면 당첨!", ref yPos);
+            CreateHelpText(parent, "", ref yPos);  // 공백
+
+            // 페이라인 그림 설명
+            CreatePaylineVisual(parent, ref yPos);
+
+            yPos -= 8.007f;
+
+            // === 배당률 설명 섹션 ===
+            CreateHelpSection(parent, "💰 배당률 (베팅액 기준)", ref yPos);
+
+            string[] payoutInfo = {
+                "• 미니윈 (2줄 일치): 2.0배",
+                "• 스몰윈 (3줄 일치): 2.5배",
+                "• 빅윈 (희귀 심볼): 5.0배",
+                "• 잭팟 (특수 조합): 10배",
+                "• 메가잭팟 (최고): 100배!"
+            };
+
+            foreach (string info in payoutInfo)
+            {
+                CreateHelpText(parent, info, ref yPos, 11.21f, new Color(0.8f, 1f, 0.8f));
+            }
+
+            yPos -= 6.005f;
+
+            // === 연승 콤보 설명 ===
+            CreateHelpSection(parent, "🔥 연승 콤보 보너스", ref yPos);
+            CreateHelpText(parent, "연속 당첨 시 보너스 배율 증가!", ref yPos);
+            CreateHelpText(parent, "• 2연승: +10% / 3연승: +20%", ref yPos, 10.409f, new Color(1f, 0.9f, 0.6f));
+            CreateHelpText(parent, "• 5연승: +50% / 10연승: +100%!", ref yPos, 10.409f, new Color(1f, 0.9f, 0.6f));
+
+            yPos -= 6.005f;
+
+            // === 게임 팁 ===
+            CreateHelpSection(parent, "💡 게임 팁", ref yPos);
+            CreateHelpText(parent, "• 자동수집을 먼저 구매하세요!", ref yPos, 10.409f, new Color(0.7f, 0.9f, 1f));
+            CreateHelpText(parent, "• 50K 골드에서 첫 프레스티지 가능", ref yPos, 10.409f, new Color(0.7f, 0.9f, 1f));
+            CreateHelpText(parent, "• AUTO 버튼으로 자동 스핀!", ref yPos, 10.409f, new Color(0.7f, 0.9f, 1f));
+        }
+
+        private void CreateHelpSection(RectTransform parent, string title, ref float yPos)
+        {
+            yPos -= 6.005f;
+            GameObject sectionObj = CreateTextObject(parent, "Section", title,
+                new Vector2(0, 1), new Vector2(1, 1), new Vector2(8.007f, yPos), 12.81f);
+            var sectionText = sectionObj.GetComponent<TextMeshProUGUI>();
+            sectionText.color = new Color(1f, 0.7f, 0.4f);
+            sectionText.fontStyle = FontStyles.Bold;
+            sectionText.alignment = TextAlignmentOptions.Left;
+
+            var sectionRect = sectionObj.GetComponent<RectTransform>();
+            sectionRect.sizeDelta = new Vector2(-16.014f, 16.014f);
+            sectionRect.anchoredPosition = new Vector2(0, yPos);
+
+            yPos -= 18.015f;
+        }
+
+        private void CreateHelpText(RectTransform parent, string text, ref float yPos, float fontSize = 10.409f, Color? color = null)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                yPos -= 4.003f;
+                return;
+            }
+
+            GameObject textObj = CreateTextObject(parent, "HelpText", text,
+                new Vector2(0, 1), new Vector2(1, 1), new Vector2(12.01f, yPos), fontSize);
+            var helpText = textObj.GetComponent<TextMeshProUGUI>();
+            helpText.color = color ?? new Color(0.9f, 0.9f, 0.9f);
+            helpText.alignment = TextAlignmentOptions.Left;
+
+            var textRect = textObj.GetComponent<RectTransform>();
+            textRect.sizeDelta = new Vector2(-24.021f, 14.012f);
+            textRect.anchoredPosition = new Vector2(0, yPos);
+
+            yPos -= 14.012f;
+        }
+
+        private void CreatePaylineVisual(RectTransform parent, ref float yPos)
+        {
+            // 페이라인 시각적 설명 (간단한 그리드)
+            float startY = yPos;
+            float gridSize = 16.014f;
+            float spacing = 3.203f;
+            float startX = 12.01f;
+
+            // 3x3 그리드 + 라인 설명
+            string[,] gridLabels = {
+                { "0", "1", "2" },
+                { "3", "4", "5" },
+                { "6", "7", "8" }
+            };
+
+            // 그리드 배경
+            GameObject gridBg = CreatePanel(parent, "GridBg",
+                new Vector2(0, 1), new Vector2(0, 1),
+                new Vector2(startX + 28.024f, yPos - 28.024f), new Vector2(64.056f, 64.056f),
+                new Color(0.2f, 0.2f, 0.25f, 0.8f));
+
+            // 페이라인 설명 텍스트
+            string[] lineDescriptions = {
+                "─ 가로 3줄",
+                "╲ ╱ 대각선 2줄",
+                "= 총 5개 라인"
+            };
+
+            float descX = startX + 80.069f;
+            float descY = yPos - 12.01f;
+
+            foreach (string desc in lineDescriptions)
+            {
+                GameObject descObj = CreateTextObject(parent, "LineDesc", desc,
+                    new Vector2(0, 1), new Vector2(0, 1), new Vector2(descX, descY), 9.608f);
+                var descText = descObj.GetComponent<TextMeshProUGUI>();
+                descText.color = new Color(0.8f, 0.8f, 0.9f);
+                descY -= 14.012f;
+            }
+
+            // 예시 설명
+            GameObject exampleObj = CreateTextObject(parent, "Example", "예: 🍒🍒🍒 = 당첨!",
+                new Vector2(0, 1), new Vector2(0, 1), new Vector2(descX, descY - 4.003f), 10.409f);
+            var exampleText = exampleObj.GetComponent<TextMeshProUGUI>();
+            exampleText.color = new Color(0.5f, 1f, 0.5f);
+
+            yPos -= 72.062f;
+        }
+
+        private void ToggleHelpPanel()
+        {
+            _isHelpVisible = !_isHelpVisible;
+            if (_helpPanel != null)
+            {
+                _helpPanel.SetActive(_isHelpVisible);
+
+                // 열릴 때 애니메이션
+                if (_isHelpVisible)
+                {
+                    _helpPanel.transform.localScale = Vector3.one * 0.8f;
+                    _helpPanel.transform.DOScale(1f, 0.25f).SetEase(Ease.OutBack);
+                }
             }
         }
 
@@ -3110,27 +3454,42 @@ namespace SlotClicker.UI
 
         private void OnClickResult(ClickResult result)
         {
+            // WebGL 이펙트 쓰로틀링 - 프레임당 이펙트 수 제한
+            float currentTime = Time.realtimeSinceStartup;
+            bool shouldThrottle = _isWebGL && (currentTime - _lastEffectTime) < EFFECT_THROTTLE_INTERVAL;
+
             // 아이들 펄스 일시 정지
             PauseIdlePulse();
 
             // 스트릭 갱신 (사운드/이펙트 강도에 영향)
             UpdateClickStreak(result.Position, result.IsCritical);
 
-            // 클릭 사운드 + 플로팅 텍스트 + 리플 + 클릭 영역 피드백
+            // 필수 피드백 (항상 실행)
             PlayClickSound(result.IsCritical);
-            SpawnClickRipple(result.Position, result.IsCritical);
-            if (!_streakBurstTriggeredThisClick)
-            {
-                SpawnStreakEchoRipples(result.Position, result.IsCritical, burstMode: false);
-            }
             SpawnFloatingText(result.Position, result.GoldEarned, result.IsCritical);
-            PlayClickAreaFeedback(result.IsCritical);
 
-            // 파티클 이펙트
-            SpawnClickParticles(result.Position, result.IsCritical);
+            // 선택적 이펙트 (쓰로틀링 적용)
+            if (!shouldThrottle)
+            {
+                _lastEffectTime = currentTime;
 
-            // 일반 클릭에도 아주 약한 화면 쉐이크 추가
-            if (!result.IsCritical)
+                SpawnClickRipple(result.Position, result.IsCritical);
+                if (!_streakBurstTriggeredThisClick)
+                {
+                    SpawnStreakEchoRipples(result.Position, result.IsCritical, burstMode: false);
+                }
+                PlayClickAreaFeedback(result.IsCritical);
+
+                // 파티클 이펙트 (WebGL에서 더 제한적으로)
+                if (!_isWebGL || _frameEffectCount < MAX_EFFECTS_PER_FRAME)
+                {
+                    SpawnClickParticles(result.Position, result.IsCritical);
+                    _frameEffectCount++;
+                }
+            }
+
+            // 일반 클릭에도 아주 약한 화면 쉐이크 추가 (WebGL에서는 스킵)
+            if (!result.IsCritical && !_isWebGL)
             {
                 PlayMicroShake();
             }
@@ -3139,7 +3498,8 @@ namespace SlotClicker.UI
             bool allowHitStop = result.IsCritical ||
                 (_hitStopOnStreakBurst && _enableClickStreak && _streakBurstTriggeredThisClick && _streakLevel >= _streakHitStopMinLevel);
 
-            if (allowHitStop)
+            // WebGL에서는 히트스톱 비활성화 (입력 지연 방지)
+            if (allowHitStop && !_isWebGL)
             {
                 PlayHitStop(result.IsCritical);
             }
@@ -3165,8 +3525,8 @@ namespace SlotClicker.UI
             floatText.transform.DOKill();
 
             Vector2 startPos = position + new Vector2(
-                UnityEngine.Random.Range(-14f, 14f),
-                UnityEngine.Random.Range(-6f, 12f));
+                UnityEngine.Random.Range(-5.605f, 5.605f),
+                UnityEngine.Random.Range(-2.402f, 4.804f));
 
             rect.anchoredPosition = startPos;
             rect.localScale = Vector3.one * (isCritical ? 0.95f : 0.85f);
@@ -3179,7 +3539,7 @@ namespace SlotClicker.UI
                 : floatText.GetComponent<TextMeshProUGUI>();
 
             tmp.DOKill();
-            tmp.fontSize = isCritical ? 52 : 40;
+            tmp.fontSize = isCritical ? 20.818f : 16.014f;
             tmp.alpha = 1f; // 알파 초기화 (풀에서 재사용 시 필요)
 
             // 코인 아이콘 알파 초기화 및 크기 조정
@@ -3196,7 +3556,7 @@ namespace SlotClicker.UI
                 RectTransform coinRect = coinChild.GetComponent<RectTransform>();
                 if (coinRect != null)
                 {
-                    float coinSize = isCritical ? 52f : 40f;
+                    float coinSize = isCritical ? 20.818f : 16.014f;
                     coinRect.sizeDelta = new Vector2(coinSize, coinSize);
                     LayoutElement coinLayout = coinChild.GetComponent<LayoutElement>();
                     if (coinLayout != null)
@@ -3208,8 +3568,8 @@ namespace SlotClicker.UI
             }
 
             // 애니메이션 (완료 시 풀에 반환)
-            float travelY = isCritical ? 185f : 135f;
-            float horizontalDrift = UnityEngine.Random.Range(-40f, 40f);
+            float travelY = isCritical ? 74.064f : 54.047f;
+            float horizontalDrift = UnityEngine.Random.Range(-16.014f, 16.014f);
             float duration = isCritical ? 1.0f : 0.85f;
             Vector2 targetPos = startPos + new Vector2(horizontalDrift, travelY);
 
@@ -3366,7 +3726,7 @@ namespace SlotClicker.UI
         }
 
         private float _lastAutoSpinClickTime = 0f;
-        private const float DOUBLE_CLICK_TIME = 0.3f;
+        private const float DOUBLE_CLICK_TIME = 0.4f;
 
         private void OnAutoSpinClicked()
         {
@@ -3379,23 +3739,23 @@ namespace SlotClicker.UI
 
             float currentTime = Time.time;
 
-            // 더블클릭 감지 - 자동 스핀 시작
+            // 더블클릭 감지 - 횟수 변경 (싱글클릭은 즉시 시작)
             if (currentTime - _lastAutoSpinClickTime < DOUBLE_CLICK_TIME)
             {
-                StartAutoSpin();
-                _lastAutoSpinClickTime = 0f;
+                // 더블클릭: 횟수 순환
+                int currentIndex = System.Array.IndexOf(_autoSpinOptions, _autoSpinCount);
+                currentIndex = (currentIndex + 1) % _autoSpinOptions.Length;
+                _autoSpinCount = _autoSpinOptions[currentIndex];
+                UpdateAutoSpinButton();
+                ShowToast($"Auto-spin: x{_autoSpinCount}", new Color(0.7f, 0.7f, 0.9f), 0.8f);
+                _lastAutoSpinClickTime = currentTime;
                 return;
             }
 
             _lastAutoSpinClickTime = currentTime;
 
-            // 자동 스핀 횟수 순환
-            int currentIndex = System.Array.IndexOf(_autoSpinOptions, _autoSpinCount);
-            currentIndex = (currentIndex + 1) % _autoSpinOptions.Length;
-            _autoSpinCount = _autoSpinOptions[currentIndex];
-
-            UpdateAutoSpinButton();
-            ShowToast($"Auto-spin: x{_autoSpinCount} (Double-tap to start)", new Color(0.7f, 0.7f, 0.9f), 1f);
+            // 싱글클릭: 즉시 자동 스핀 시작
+            StartAutoSpin();
         }
 
         public void StartAutoSpin()
@@ -3457,8 +3817,8 @@ namespace SlotClicker.UI
                 // 잭팟 당첨 시 중지
                 // (OnSlotSpinComplete에서 체크하여 StopAutoSpin 호출)
 
-                // 다음 스핀 전 짧은 딜레이
-                yield return MobileOptimizer.GetWait(0.5f);
+                // 다음 스핀 전 짧은 딜레이 (게임 템포 개선)
+                yield return MobileOptimizer.GetWait(0.2f);
             }
 
             if (_autoSpinRemaining <= 0)
@@ -3490,7 +3850,7 @@ namespace SlotClicker.UI
             }
             else
             {
-                _autoSpinText.text = $"AUTO\nx{_autoSpinCount}";
+                _autoSpinText.text = $"x{_autoSpinCount}";
                 if (autoImg != null)
                 {
                     autoImg.color = hasCustomSprites
@@ -3559,6 +3919,7 @@ namespace SlotClicker.UI
 
         /// <summary>
         /// 릴 스핀 애니메이션 코루틴 - 가속/고속/감속 3단계 애니메이션
+        /// SpinProfile이 있으면 프로파일 값 사용, 없으면 기본값 사용
         /// </summary>
         private System.Collections.IEnumerator SpinReelAnimation(int reelIndex)
         {
@@ -3570,15 +3931,20 @@ namespace SlotClicker.UI
                 ? _symbolSprites.Length
                 : _game.Config.symbolCount;
 
-            // ★ 열(column)별 시작 딜레이 - 왼쪽부터 시작
+            // ★ 열(column)별 시작 딜레이 - 프로파일 또는 기본값
             int column = reelIndex % 3;
-            yield return MobileOptimizer.GetWait(column * 0.08f);
+            float columnDelay = _spinProfile != null
+                ? _spinProfile.GetColumnStopDelay(column)
+                : column * 0.08f;
+            yield return MobileOptimizer.GetWait(columnDelay);
 
-            // ★ Phase 1: 가속 (0.3초) - 느리게 시작해서 빠르게
-            float accelerationDuration = 0.3f;
+            // ★ 프로파일 또는 기본값에서 파라미터 가져오기
+            float accelerationDuration = _spinProfile != null ? _spinProfile.accelDuration : 0.3f;
+            float startSpeed = _spinProfile != null ? _spinProfile.accelStartSpeed : 0.15f;
+            float maxSpeed = _spinProfile != null ? _spinProfile.maxSpeed : 0.03f;
+
+            // ★ Phase 1: 가속 - 느리게 시작해서 빠르게
             float accelerationTime = 0f;
-            float startSpeed = 0.15f;  // 시작 속도 (느림)
-            float maxSpeed = 0.03f;    // 최대 속도 (빠름)
 
             while (accelerationTime < accelerationDuration && reelIndex < _isReelSpinning.Length && _isReelSpinning[reelIndex])
             {
@@ -3603,6 +3969,7 @@ namespace SlotClicker.UI
 
         /// <summary>
         /// 스핀 단계별 심볼 변경 및 효과
+        /// SpinProfile 파라미터 사용
         /// </summary>
         private void SpinReelStep(int reelIndex, int symbolCount, float speed, bool slideEffect)
         {
@@ -3615,13 +3982,18 @@ namespace SlotClicker.UI
             Transform symbolTransform = _reelSymbols[reelIndex].transform;
             symbolTransform.DOKill();
 
+            // ★ 프로파일에서 값 가져오기
+            float slideDistance = _spinProfile != null ? _spinProfile.slideDistance : 15f;
+            float punchScale = _spinProfile != null ? _spinProfile.accelPunchScale : 0.06f;
+            float blurAlpha = _spinProfile != null ? _spinProfile.spinBlurAlpha : 0.85f;
+
             if (slideEffect)
             {
                 // 가속 단계: 아래에서 위로 슬라이드 + 스케일 펀치
                 RectTransform rect = symbolTransform.GetComponent<RectTransform>();
                 if (rect != null)
                 {
-                    rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, -15f);
+                    rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, -slideDistance);
                     rect.DOAnchorPosY(0f, speed * 0.8f).SetEase(Ease.OutQuad);
                 }
                 symbolTransform.localScale = Vector3.one * 0.9f;
@@ -3631,7 +4003,7 @@ namespace SlotClicker.UI
             {
                 // 고속 단계: 빠른 스케일 펀치
                 symbolTransform.localScale = Vector3.one;
-                symbolTransform.DOPunchScale(Vector3.one * 0.06f, speed * 0.8f, 0, 0);
+                symbolTransform.DOPunchScale(Vector3.one * punchScale, speed * 0.8f, 0, 0);
             }
 
             // 블러 효과 (고속 시 약간 투명하게)
@@ -3639,7 +4011,7 @@ namespace SlotClicker.UI
             if (symbolImage != null && speed < 0.05f)
             {
                 symbolImage.DOKill();
-                symbolImage.color = new Color(1f, 1f, 1f, 0.85f);
+                symbolImage.color = new Color(1f, 1f, 1f, blurAlpha);
             }
         }
 
@@ -3688,6 +4060,7 @@ namespace SlotClicker.UI
 
         /// <summary>
         /// 릴 정지 애니메이션 - 감속 효과와 바운스
+        /// SpinProfile 파라미터 사용
         /// </summary>
         private System.Collections.IEnumerator ReelStopAnimation(int reelIndex, int finalSymbolIndex)
         {
@@ -3698,10 +4071,17 @@ namespace SlotClicker.UI
                 ? _symbolSprites.Length
                 : _game.Config.symbolCount;
 
-            // ★ Phase 1: 감속 (2-3회 심볼 변경하며 느려짐)
-            float[] decelerationSpeeds = { 0.06f, 0.10f, 0.15f };
-            for (int i = 0; i < decelerationSpeeds.Length; i++)
+            // ★ 프로파일에서 감속 파라미터 가져오기
+            int decelSteps = _spinProfile != null ? _spinProfile.decelerationSteps : 3;
+            float blurAlpha = _spinProfile != null ? _spinProfile.spinBlurAlpha : 0.85f;
+
+            // ★ Phase 1: 감속 (프로파일 기반 심볼 변경하며 느려짐)
+            for (int i = 0; i < decelSteps; i++)
             {
+                float decelSpeed = _spinProfile != null
+                    ? _spinProfile.GetDecelerationSpeed(i, decelSteps)
+                    : 0.06f + (i * 0.04f); // 기본: 0.06, 0.10, 0.14...
+
                 int randomSymbol = UnityEngine.Random.Range(0, symbolCount);
                 SetReelSymbol(reelIndex, randomSymbol);
 
@@ -3712,17 +4092,27 @@ namespace SlotClicker.UI
                 // 위에서 아래로 슬라이드 (감속 느낌)
                 if (rect != null)
                 {
-                    rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, 12f);
-                    rect.DOAnchorPosY(0f, decelerationSpeeds[i] * 0.9f).SetEase(Ease.OutQuad);
+                    rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, 4.804f);
+                    rect.DOAnchorPosY(0f, decelSpeed * 0.9f).SetEase(Ease.OutQuad);
                 }
 
                 // 점점 선명해지는 효과
                 _reelSymbols[reelIndex].DOKill();
-                float alpha = 0.85f + (i * 0.05f);
+                float alphaProgress = (float)i / Mathf.Max(1, decelSteps - 1);
+                float alpha = blurAlpha + ((1f - blurAlpha) * alphaProgress);
                 _reelSymbols[reelIndex].color = new Color(1f, 1f, 1f, alpha);
 
-                yield return MobileOptimizer.GetWait(decelerationSpeeds[i]);
+                yield return MobileOptimizer.GetWait(decelSpeed);
             }
+
+            // ★ 프로파일에서 바운스 파라미터 가져오기
+            float bounceIntensity = _spinProfile != null ? _spinProfile.bounceIntensity : 0.12f;
+            float bounceDuration = _spinProfile != null ? _spinProfile.bounceDuration : 0.3f;
+            int bounceVibrato = _spinProfile != null ? _spinProfile.bounceVibrato : 4;
+            float bounceElasticity = _spinProfile != null ? _spinProfile.bounceElasticity : 0.6f;
+            bool enableFlash = _spinProfile != null ? _spinProfile.enableLandingFlash : true;
+            float flashIntensity = _spinProfile != null ? _spinProfile.flashIntensity : 1.4f;
+            float flashDuration = _spinProfile != null ? _spinProfile.flashDuration : 0.1f;
 
             // ★ Phase 2: 최종 심볼 설정 + 바운스 정지
             Transform finalTransform = _reelSymbols[reelIndex].transform;
@@ -3738,18 +4128,31 @@ namespace SlotClicker.UI
             // 위에서 떨어지며 착지하는 효과
             if (finalRect != null)
             {
-                finalRect.anchoredPosition = new Vector2(finalRect.anchoredPosition.x, 18f);
+                finalRect.anchoredPosition = new Vector2(finalRect.anchoredPosition.x, 7.206f);
                 finalRect.DOAnchorPosY(0f, 0.2f).SetEase(Ease.OutBounce);
             }
 
-            // 바운스 스케일 효과
-            finalTransform.DOPunchScale(Vector3.one * 0.12f, 0.3f, 4, 0.6f);
+            // 마지막 열인지 확인 (column 2 = 인덱스 2, 5, 8)
+            bool isLastColumn = (reelIndex == 2 || reelIndex == 5 || reelIndex == 8);
+            bool isVeryLastReel = (reelIndex == 8);  // 가장 마지막 릴
+
+            // 마지막 열은 더 강한 바운스
+            float finalBounce = isLastColumn ? bounceIntensity * 1.5f : bounceIntensity;
+            int finalVibrato = isLastColumn ? bounceVibrato + 2 : bounceVibrato;
+
+            // 바운스 스케일 효과 (프로파일 파라미터 사용)
+            finalTransform.DOPunchScale(Vector3.one * finalBounce, bounceDuration, finalVibrato, bounceElasticity);
 
             // 정지 플래시 효과 (선명하게 복원)
             _reelSymbols[reelIndex].DOKill();
             _reelSymbols[reelIndex].color = Color.white;
-            _reelSymbols[reelIndex].DOColor(Color.white * 1.4f, 0.1f)
-                .OnComplete(() => _reelSymbols[reelIndex].DOColor(Color.white, 0.2f));
+
+            if (enableFlash)
+            {
+                float finalFlash = isLastColumn ? flashIntensity * 1.3f : flashIntensity;
+                _reelSymbols[reelIndex].DOColor(Color.white * finalFlash, flashDuration)
+                    .OnComplete(() => _reelSymbols[reelIndex].DOColor(Color.white, flashDuration * 2f));
+            }
 
             // ★ 릴 정지 사운드
             if (SoundManager.Instance != null)
@@ -3757,8 +4160,20 @@ namespace SlotClicker.UI
                 SoundManager.Instance.PlaySFX(SoundType.ReelStop);
             }
 
-            // 햅틱 피드백 (가벼운 진동)
-            UIFeedback.TriggerHaptic(UIFeedback.HapticType.Light);
+            // 햅틱 피드백 (마지막 열은 더 강하게)
+            if (isVeryLastReel)
+            {
+                UIFeedback.TriggerHaptic(UIFeedback.HapticType.Medium);
+                // 마지막 릴 정지 시 화면 살짝 흔들림
+                if (_mainCanvas != null)
+                {
+                    _mainCanvas.transform.DOShakePosition(0.15f, 5f, 12, 90f, false, true);
+                }
+            }
+            else
+            {
+                UIFeedback.TriggerHaptic(UIFeedback.HapticType.Light);
+            }
         }
 
         private void OnSlotSpinComplete(SlotResult result)
@@ -3813,14 +4228,32 @@ namespace SlotClicker.UI
             }
             else
             {
-                // 패배 시 기본 결과 표시
-                ShowResult("No Match...", Color.gray);
+                // 니어미스 피드백 (아깝게 놓친 경우)
+                if (result.IsNearMiss && result.NearMissPayline != null && result.NearMissPayline.Length > 0)
+                {
+                    ShowResult("SO CLOSE!", new Color(1f, 0.6f, 0.3f));
+                    ShowToast("Almost there! Try again!", new Color(1f, 0.7f, 0.4f), 1.2f);
+
+                    // 니어미스 페이라인 하이라이트 (깜빡임)
+                    HighlightNearMissReels(result.NearMissPayline);
+                }
+                else
+                {
+                    // 일반 패배
+                    ShowResult("No Match...", Color.gray);
+                }
 
                 // 패배 사운드 재생
                 if (SoundManager.Instance != null)
                 {
                     SoundManager.Instance.PlaySlotResultSound(SlotOutcome.Loss);
                 }
+            }
+
+            // 연승 콤보 피드백 (2연승 이상)
+            if (result.WinStreak >= 2)
+            {
+                ShowComboFeedback(result.WinStreak, result.ComboMultiplier);
             }
 
             // 잭팟 당첨 시 자동 스핀 중지
@@ -3830,16 +4263,16 @@ namespace SlotClicker.UI
                 ShowToast("JACKPOT! Auto-spin stopped", new Color(1f, 0.8f, 0.2f));
             }
 
-            // 결과에 따른 Ready 상태 복귀 지연 시간 조정
+            // 결과에 따른 Ready 상태 복귀 지연 시간 조정 (게임 템포 개선)
             float readyDelay = result.Outcome switch
             {
-                SlotOutcome.MegaJackpot => 6f,
-                SlotOutcome.Jackpot => 4.5f,
-                SlotOutcome.BigWin => 3f,
-                SlotOutcome.SmallWin => 2.5f,
-                SlotOutcome.MiniWin => 2f,
-                SlotOutcome.Draw => 1.5f,
-                _ => 1.2f
+                SlotOutcome.MegaJackpot => 2.5f,  // 6f → 2.5f
+                SlotOutcome.Jackpot => 2f,        // 4.5f → 2f
+                SlotOutcome.BigWin => 1.5f,       // 3f → 1.5f
+                SlotOutcome.SmallWin => 1f,       // 2.5f → 1f
+                SlotOutcome.MiniWin => 0.8f,      // 2f → 0.8f
+                SlotOutcome.Draw => 0.6f,         // 1.5f → 0.6f
+                _ => 0.5f                          // 1.2f → 0.5f
             };
 
             DOVirtual.DelayedCall(readyDelay, () => SetSpinState(SpinUIState.Ready));
@@ -3877,6 +4310,82 @@ namespace SlotClicker.UI
                         _resultText.alpha = 1f;
                     });
                 });
+            }
+        }
+
+        /// <summary>
+        /// 니어미스 릴 하이라이트 (아깝게 놓친 심볼 강조)
+        /// </summary>
+        private void HighlightNearMissReels(int[] paylineIndices)
+        {
+            if (_reelFrames == null || paylineIndices == null) return;
+
+            Color nearMissColor = new Color(1f, 0.5f, 0.2f, 1f);  // 주황색
+
+            foreach (int idx in paylineIndices)
+            {
+                if (idx >= 0 && idx < _reelFrames.Length && _reelFrames[idx] != null)
+                {
+                    Image frame = _reelFrames[idx];
+                    Color originalColor = frame.color;
+
+                    // 깜빡임 효과 (3회)
+                    Sequence blinkSeq = DOTween.Sequence();
+                    blinkSeq.Append(frame.DOColor(nearMissColor, 0.12f));
+                    blinkSeq.Append(frame.DOColor(originalColor, 0.12f));
+                    blinkSeq.SetLoops(3);
+                    blinkSeq.OnComplete(() => frame.color = originalColor);
+
+                    // 심볼 흔들기
+                    if (_reelSymbols != null && idx < _reelSymbols.Length && _reelSymbols[idx] != null)
+                    {
+                        _reelSymbols[idx].transform.DOShakePosition(0.5f, 8f, 15, 90f, false, true);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 연승 콤보 피드백
+        /// </summary>
+        private void ShowComboFeedback(int streak, float multiplier)
+        {
+            string comboText = streak switch
+            {
+                2 => "2x COMBO!",
+                3 => "3x COMBO!!",
+                4 => "4x COMBO!!!",
+                5 => "5x STREAK!",
+                >= 6 => $"{streak}x SUPER STREAK!",
+                _ => ""
+            };
+
+            if (string.IsNullOrEmpty(comboText)) return;
+
+            Color comboColor = streak switch
+            {
+                2 => new Color(0.4f, 0.8f, 1f),      // 하늘색
+                3 => new Color(0.4f, 1f, 0.6f),      // 연두색
+                4 => new Color(1f, 0.9f, 0.3f),      // 노란색
+                5 => new Color(1f, 0.6f, 0.2f),      // 주황색
+                >= 6 => new Color(1f, 0.3f, 0.5f),   // 분홍색
+                _ => Color.white
+            };
+
+            // 콤보 토스트 표시
+            ShowToast($"{comboText} (+{(multiplier - 1f) * 100:F0}% Bonus!)", comboColor, 1.5f);
+
+            // 콤보 이펙트 (화면 가장자리 글로우)
+            if (streak >= 3)
+            {
+                PlayScreenGlow(false);
+            }
+
+            // 5연승 이상이면 추가 파티클
+            if (streak >= 5)
+            {
+                Vector2 centerPos = Vector2.zero;
+                SpawnClickParticles(centerPos, true);
             }
         }
 
@@ -3967,6 +4476,58 @@ namespace SlotClicker.UI
 
             // 강력한 햅틱
             UIFeedback.TriggerHaptic(UIFeedback.HapticType.Heavy);
+        }
+
+        #endregion
+
+        #region SpinProfile API
+
+        /// <summary>
+        /// 현재 스핀 프로파일 (읽기 전용)
+        /// </summary>
+        public SlotClickerSpinProfile SpinProfile => _spinProfile;
+
+        /// <summary>
+        /// 런타임에 스핀 프로파일 설정
+        /// </summary>
+        /// <param name="profile">새로운 스핀 프로파일 (null이면 기본값 사용)</param>
+        public void SetSpinProfile(SlotClickerSpinProfile profile)
+        {
+            _spinProfile = profile;
+            Debug.Log($"[SlotClickerUI] SpinProfile changed to: {(profile != null ? profile.name : "Default")}");
+        }
+
+        /// <summary>
+        /// Resources 폴더에서 스핀 프로파일 로드
+        /// </summary>
+        /// <param name="profileName">프로파일 이름 (확장자 제외)</param>
+        /// <returns>로드 성공 여부</returns>
+        public bool LoadSpinProfileFromResources(string profileName)
+        {
+            SlotClickerSpinProfile profile = Resources.Load<SlotClickerSpinProfile>(profileName);
+            if (profile != null)
+            {
+                SetSpinProfile(profile);
+                return true;
+            }
+
+            Debug.LogWarning($"[SlotClickerUI] SpinProfile not found in Resources: {profileName}");
+            return false;
+        }
+
+        /// <summary>
+        /// 현재 프로파일 파라미터 정보 문자열
+        /// </summary>
+        public string GetSpinProfileInfo()
+        {
+            if (_spinProfile == null)
+                return "SpinProfile: Default (no profile assigned)";
+
+            return $"SpinProfile: {_spinProfile.name}\n" +
+                   $"  Accel: {_spinProfile.accelDuration}s, Start:{_spinProfile.accelStartSpeed}, Max:{_spinProfile.maxSpeed}\n" +
+                   $"  Decel: {_spinProfile.decelerationSteps} steps\n" +
+                   $"  Bounce: {_spinProfile.bounceIntensity}, {_spinProfile.bounceDuration}s, vibrato:{_spinProfile.bounceVibrato}\n" +
+                   $"  Flash: {(_spinProfile.enableLandingFlash ? "ON" : "OFF")}, intensity:{_spinProfile.flashIntensity}";
         }
 
         #endregion

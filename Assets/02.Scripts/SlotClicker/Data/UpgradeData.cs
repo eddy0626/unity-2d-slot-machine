@@ -246,7 +246,7 @@ namespace SlotClicker.Data
                     description = "초당 자동으로 골드 획득",
                     category = UpgradeCategory.Gold,
                     effect = UpgradeEffect.AutoCollect,
-                    baseCost = 500,          // 1000 → 500 (초반 접근성)
+                    baseCost = 300,          // 500 → 300 (초반 진입장벽 낮춤)
                     costMultiplier = 1.18f,  // 1.25 → 1.18
                     maxLevel = -1,
                     effectPerLevel = 1f,     // 0.1 → 1 (10배 증가!)

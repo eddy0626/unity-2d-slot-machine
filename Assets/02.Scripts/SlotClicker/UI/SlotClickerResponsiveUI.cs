@@ -38,22 +38,22 @@ namespace SlotClicker.UI
         [SerializeField] private RectTransform _prestigeButton;
 
         [Header("=== Portrait 레이아웃 설정 ===")]
-        [SerializeField] private Vector2 _portraitSlotPosition = new Vector2(0, -475);
-        [SerializeField] private Vector2 _portraitSlotSize = new Vector2(480, 480);
-        [SerializeField] private Vector2 _portraitClickPosition = new Vector2(0, -280);
-        [SerializeField] private Vector2 _portraitClickSize = new Vector2(420, 150);
-        [SerializeField] private Vector2 _portraitBettingPosition = new Vector2(0, 150);
+        [SerializeField] private Vector2 _portraitSlotPosition = new Vector2(0, -190.165f);
+        [SerializeField] private Vector2 _portraitSlotSize = new Vector2(192.167f, 192.167f);
+        [SerializeField] private Vector2 _portraitClickPosition = new Vector2(0, -112.097f);
+        [SerializeField] private Vector2 _portraitClickSize = new Vector2(168.146f, 60.052f);
+        [SerializeField] private Vector2 _portraitBettingPosition = new Vector2(0, 60.052f);
 
         [Header("=== Landscape 레이아웃 설정 ===")]
-        [SerializeField] private Vector2 _landscapeSlotPosition = new Vector2(-300, 0);
-        [SerializeField] private Vector2 _landscapeSlotSize = new Vector2(400, 400);
-        [SerializeField] private Vector2 _landscapeClickPosition = new Vector2(300, 100);
-        [SerializeField] private Vector2 _landscapeClickSize = new Vector2(350, 120);
-        [SerializeField] private Vector2 _landscapeBettingPosition = new Vector2(300, -150);
+        [SerializeField] private Vector2 _landscapeSlotPosition = new Vector2(-120.104f, 0);
+        [SerializeField] private Vector2 _landscapeSlotSize = new Vector2(160.139f, 160.139f);
+        [SerializeField] private Vector2 _landscapeClickPosition = new Vector2(120.104f, 40.035f);
+        [SerializeField] private Vector2 _landscapeClickSize = new Vector2(140.122f, 48.042f);
+        [SerializeField] private Vector2 _landscapeBettingPosition = new Vector2(120.104f, -60.052f);
 
         [Header("=== CanvasScaler 설정 ===")]
-        [SerializeField] private Vector2 _portraitResolution = new Vector2(1080, 1920);
-        [SerializeField] private Vector2 _landscapeResolution = new Vector2(1920, 1080);
+        [SerializeField] private Vector2 _portraitResolution = new Vector2(390, 844);
+        [SerializeField] private Vector2 _landscapeResolution = new Vector2(844, 390);
         [SerializeField] private float _portraitMatch = 0.5f;
         [SerializeField] private float _landscapeMatch = 0.5f;
 

@@ -117,7 +117,7 @@ namespace SlotClicker.UI
         // Screen Effects
         private Image _screenFlash;
         private Image[] _screenGlowEdges;
-        private float _screenGlowThickness = 60f;
+        private float _screenGlowThickness = 24.021f;
 
         // Particle System
         private GameObject _particlePrefab;
@@ -197,8 +197,8 @@ namespace SlotClicker.UI
             RectTransform bannerRect = _winBanner.AddComponent<RectTransform>();
             bannerRect.anchorMin = new Vector2(0.5f, 0.5f);
             bannerRect.anchorMax = new Vector2(0.5f, 0.5f);
-            bannerRect.sizeDelta = new Vector2(700, 250);
-            bannerRect.anchoredPosition = new Vector2(0, 100);
+            bannerRect.sizeDelta = new Vector2(280.243f, 100.087f);
+            bannerRect.anchoredPosition = new Vector2(0, 40.035f);
             _winBannerRect = bannerRect;
             _bannerBaseAnchoredPosition = bannerRect.anchoredPosition;
 
@@ -212,8 +212,8 @@ namespace SlotClicker.UI
             RectTransform glowRect = glowObj.AddComponent<RectTransform>();
             glowRect.anchorMin = Vector2.zero;
             glowRect.anchorMax = Vector2.one;
-            glowRect.offsetMin = new Vector2(-50, -50);
-            glowRect.offsetMax = new Vector2(50, 50);
+            glowRect.offsetMin = new Vector2(-20.017f, -20.017f);
+            glowRect.offsetMax = new Vector2(20.017f, 20.017f);
 
             _winBannerGlow = glowObj.AddComponent<Image>();
             // 단색 글로우로 사용 (스프라이트 불필요)
@@ -241,12 +241,12 @@ namespace SlotClicker.UI
             RectTransform titleRect = titleObj.AddComponent<RectTransform>();
             titleRect.anchorMin = new Vector2(0, 0.55f);
             titleRect.anchorMax = new Vector2(1, 1);
-            titleRect.offsetMin = new Vector2(20, 0);
-            titleRect.offsetMax = new Vector2(-20, -15);
+            titleRect.offsetMin = new Vector2(8.007f, 0);
+            titleRect.offsetMax = new Vector2(-8.007f, -6.005f);
 
             _winTitleText = titleObj.AddComponent<TextMeshProUGUI>();
             _winTitleText.text = "";
-            _winTitleText.fontSize = 72;
+            _winTitleText.fontSize = 28.823f;
             _winTitleText.fontStyle = FontStyles.Bold;
             _winTitleText.alignment = TextAlignmentOptions.Center;
             _winTitleText.color = Color.white;
@@ -259,12 +259,12 @@ namespace SlotClicker.UI
             RectTransform amountRect = amountObj.AddComponent<RectTransform>();
             amountRect.anchorMin = new Vector2(0, 0);
             amountRect.anchorMax = new Vector2(1, 0.55f);
-            amountRect.offsetMin = new Vector2(20, 15);
-            amountRect.offsetMax = new Vector2(-20, 0);
+            amountRect.offsetMin = new Vector2(8.007f, 6.005f);
+            amountRect.offsetMax = new Vector2(-8.007f, 0);
 
             _winAmountText = amountObj.AddComponent<TextMeshProUGUI>();
             _winAmountText.text = "";
-            _winAmountText.fontSize = 56;
+            _winAmountText.fontSize = 22.419f;
             _winAmountText.fontStyle = FontStyles.Bold;
             _winAmountText.alignment = TextAlignmentOptions.Center;
             _winAmountText.color = new Color(1f, 0.9f, 0.4f);
@@ -352,7 +352,7 @@ namespace SlotClicker.UI
             _particlePrefab.SetActive(false);
 
             RectTransform rect = _particlePrefab.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(20, 20);
+            rect.sizeDelta = new Vector2(8.007f, 8.007f);
 
             Image img = _particlePrefab.AddComponent<Image>();
             // 원형 파티클은 스프라이트 없이 단색으로 사용
@@ -385,7 +385,7 @@ namespace SlotClicker.UI
             _coinPrefab.SetActive(false);
 
             RectTransform rect = _coinPrefab.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(50, 50);
+            rect.sizeDelta = new Vector2(20.017f, 20.017f);
 
             Image img = _coinPrefab.AddComponent<Image>();
             img.sprite = _coinSprite;
@@ -723,7 +723,7 @@ namespace SlotClicker.UI
 
             // Show win banner with countup
             ShowWinBanner("MINI WIN!", result.FinalReward, _miniWinColor, _miniWinGlowColor,
-                _miniWinCountupDuration, 48, 36, SlotOutcome.MiniWin);
+                _miniWinCountupDuration, 19.217f, 14.412f, SlotOutcome.MiniWin);
 
             // 미니 승리도 가장자리 반응을 살짝 준다
             PlayScreenGlow(_miniWinGlowColor, 0.25f, 1);
@@ -757,7 +757,7 @@ namespace SlotClicker.UI
 
             // Show win banner
             ShowWinBanner("SMALL WIN!", result.FinalReward, _smallWinColor, _smallWinGlowColor,
-                _smallWinCountupDuration, 56, 42, SlotOutcome.SmallWin);
+                _smallWinCountupDuration, 22.419f, 16.815f, SlotOutcome.SmallWin);
 
             // Light screen glow
             PlayScreenGlow(_smallWinGlowColor, 0.4f, 2);
@@ -793,7 +793,7 @@ namespace SlotClicker.UI
 
             // Show win banner with bigger text
             ShowWinBanner("BIG WIN!", result.FinalReward, _bigWinColor, _bigWinGlowColor,
-                _bigWinCountupDuration, 64, 48, SlotOutcome.BigWin);
+                _bigWinCountupDuration, 25.622f, 19.217f, SlotOutcome.BigWin);
 
             // Haptic feedback
             UIFeedback.TriggerHaptic(UIFeedback.HapticType.Medium);
@@ -835,7 +835,7 @@ namespace SlotClicker.UI
 
             // Show win banner with large text
             ShowWinBanner("JACKPOT!", result.FinalReward, _jackpotColor, _jackpotGlowColor,
-                _jackpotCountupDuration, 80, 56, SlotOutcome.Jackpot);
+                _jackpotCountupDuration, 32.028f, 22.419f, SlotOutcome.Jackpot);
 
             // Strong haptic
             UIFeedback.TriggerHaptic(UIFeedback.HapticType.Heavy);
@@ -897,7 +897,7 @@ namespace SlotClicker.UI
 
             // Phase 7: Show mega banner
             ShowWinBanner("MEGA JACKPOT!", result.FinalReward, _megaJackpotColor, _megaJackpotGlowColor,
-                _megaJackpotCountupDuration, 90, 64, SlotOutcome.MegaJackpot);
+                _megaJackpotCountupDuration, 36.031f, 25.622f, SlotOutcome.MegaJackpot);
 
             // Phase 8: Continuous particle effects during countup
             float elapsed = 0;
@@ -941,7 +941,7 @@ namespace SlotClicker.UI
 
             // Show brief banner
             ShowWinBanner("DRAW", result.FinalReward, Color.gray, new Color(0.5f, 0.5f, 0.5f, 0.3f),
-                0.3f, 48, 36, SlotOutcome.Draw);
+                0.3f, 19.217f, 14.412f, SlotOutcome.Draw);
 
             TrackScheduledDelay(DOVirtual.DelayedCall(1.5f, () => HideWinBanner(), true));
         }
@@ -951,7 +951,7 @@ namespace SlotClicker.UI
         #region Win Banner
 
         private void ShowWinBanner(string title, double amount, Color textColor, Color glowColor,
-            float countupDuration, int titleFontSize, int amountFontSize, SlotOutcome outcome)
+            float countupDuration, float titleFontSize, float amountFontSize, SlotOutcome outcome)
         {
             if (_winBanner == null) return;
 

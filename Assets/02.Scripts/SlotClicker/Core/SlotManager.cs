@@ -25,6 +25,15 @@ namespace SlotClicker.Core
         public double FinalReward;
         public int[] WinningPayline; // 당첨 페이라인 인덱스들
         public bool IsWin => Outcome != SlotOutcome.Loss;
+
+        // 연승 콤보 시스템
+        public int WinStreak;           // 현재 연승 수
+        public float ComboMultiplier;   // 콤보 보너스 배율 (1.0 = 기본)
+
+        // 니어미스 시스템 (아깝게 놓친 상황)
+        public bool IsNearMiss;         // 니어미스 여부
+        public int[] NearMissPayline;   // 니어미스 페이라인 (2개 일치)
+        public int NearMissSymbol;      // 니어미스 심볼
     }
 
     /// <summary>
@@ -60,6 +69,12 @@ namespace SlotClicker.Core
         // 연패 추적
         private int _currentLossStreak = 0;
         public int CurrentLossStreak => _currentLossStreak;
+
+        // 연승 콤보 시스템
+        private int _currentWinStreak = 0;
+        public int CurrentWinStreak => _currentWinStreak;
+        private const float COMBO_BONUS_PER_WIN = 0.1f;  // 연승당 10% 보너스
+        private const int MAX_COMBO_STREAK = 10;          // 최대 10연승 (100% 보너스)
 
         // 이벤트
         public event Action OnSpinStart;
@@ -130,9 +145,17 @@ namespace SlotClicker.Core
         {
             // 3x3 그리드: 열(column)별로 정지 (왼쪽→오른쪽)
             // 열 0: 인덱스 0, 3, 6 / 열 1: 인덱스 1, 4, 7 / 열 2: 인덱스 2, 5, 8
+            // ★ 텐션 시스템: 마지막 열은 더 긴 딜레이로 긴장감 증가
+            float[] columnDelays = new float[]
+            {
+                _config.reelStopDelay,           // 첫 번째 열: 기본 딜레이
+                _config.reelStopDelay * 1.2f,    // 두 번째 열: 20% 더 길게
+                _config.reelStopDelay * 1.8f     // 세 번째 열: 80% 더 길게 (텐션!)
+            };
+
             for (int col = 0; col < 3; col++)
             {
-                yield return MobileOptimizer.GetWait(_config.reelStopDelay);
+                yield return MobileOptimizer.GetWait(columnDelays[col]);
 
                 // 해당 열의 3개 심볼 동시 정지
                 for (int row = 0; row < 3; row++)
@@ -142,17 +165,19 @@ namespace SlotClicker.Core
                 }
             }
 
-            // 최종 결과 처리
-            yield return MobileOptimizer.GetWait(0.5f);
+            // 최종 결과 처리 (빠르게)
+            yield return MobileOptimizer.GetWait(0.35f);
 
-            // 보상 지급 및 연패 추적
+            // 보상 지급 및 연패/연승 추적
             if (result.Outcome == SlotOutcome.Loss)
             {
                 _currentLossStreak++;
+                _currentWinStreak = 0;  // 연승 초기화
             }
             else
             {
                 _currentLossStreak = 0; // 승리 시 연패 초기화
+                _currentWinStreak++;    // 연승 증가
                 _gameManager.Gold.AddGold(result.FinalReward, false);
 
                 // 잭팟 카운트
@@ -177,24 +202,79 @@ namespace SlotClicker.Core
             {
                 BetAmount = betAmount,
                 Symbols = new int[9], // 3x3 = 9개 심볼
-                WinningPayline = Array.Empty<int>()
+                WinningPayline = Array.Empty<int>(),
+                NearMissPayline = Array.Empty<int>()
             };
 
             // 결과 확률 계산 (업그레이드 적용)
             SlotOutcome outcome = DetermineOutcome();
             result.Outcome = outcome;
 
+            // 연승 콤보 시스템 적용
+            if (outcome != SlotOutcome.Loss)
+            {
+                result.WinStreak = _currentWinStreak + 1;
+                result.ComboMultiplier = 1f + Mathf.Min(_currentWinStreak, MAX_COMBO_STREAK) * COMBO_BONUS_PER_WIN;
+            }
+            else
+            {
+                result.WinStreak = 0;
+                result.ComboMultiplier = 1f;
+            }
+
             // 배당률 적용 (보상 배율 업그레이드 포함)
             result.RewardMultiplier = GetMultiplier(outcome);
 
-            // 골드 부스트 적용
+            // 골드 부스트 적용 + 콤보 보너스 적용
             float goldBoost = _gameManager.Upgrade.GetEffectMultiplier(UpgradeEffect.GoldBoost);
-            result.FinalReward = betAmount * result.RewardMultiplier * goldBoost;
+            result.FinalReward = betAmount * result.RewardMultiplier * goldBoost * result.ComboMultiplier;
 
             // 심볼 생성 (3x3 결과에 맞게)
             GenerateSymbols3x3(result);
 
+            // 니어미스 감지 (패배 시에만)
+            if (outcome == SlotOutcome.Loss)
+            {
+                DetectNearMiss(result);
+            }
+
             return result;
+        }
+
+        /// <summary>
+        /// 니어미스 감지 - 2개 심볼이 일치하는 페이라인 찾기
+        /// </summary>
+        private void DetectNearMiss(SlotResult result)
+        {
+            foreach (var line in SlotPaylines.Lines)
+            {
+                int s0 = result.Symbols[line[0]];
+                int s1 = result.Symbols[line[1]];
+                int s2 = result.Symbols[line[2]];
+
+                // 2개가 일치하고 1개만 다른 경우
+                if (s0 == s1 && s0 != s2)
+                {
+                    result.IsNearMiss = true;
+                    result.NearMissPayline = line;
+                    result.NearMissSymbol = s0;
+                    return;
+                }
+                if (s0 == s2 && s0 != s1)
+                {
+                    result.IsNearMiss = true;
+                    result.NearMissPayline = line;
+                    result.NearMissSymbol = s0;
+                    return;
+                }
+                if (s1 == s2 && s1 != s0)
+                {
+                    result.IsNearMiss = true;
+                    result.NearMissPayline = line;
+                    result.NearMissSymbol = s1;
+                    return;
+                }
+            }
         }
 
         /// <summary>

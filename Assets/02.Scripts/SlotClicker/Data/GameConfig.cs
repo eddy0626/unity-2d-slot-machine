@@ -23,13 +23,13 @@ namespace SlotClicker.Data
         [Range(0, 100)] public float jackpotRate = 1.3f;    // 1 → 1.3
         [Range(0, 100)] public float megaJackpotRate = 0.2f; // 0.5 → 0.2
 
-        [Header("슬롯 배당률")]
+        [Header("슬롯 배당률 (개선됨)")]
         public float drawMultiplier = 1f;
-        public float miniWinMultiplier = 1.5f;
-        public float smallWinMultiplier = 2f;
-        public float bigWinMultiplier = 4f;     // 5 → 4
-        public float jackpotMultiplier = 8f;    // 10 → 8
-        public float megaJackpotMultiplier = 50f; // 100 → 50
+        public float miniWinMultiplier = 2f;      // 1.5 → 2.0 (당첨감 증가)
+        public float smallWinMultiplier = 2.5f;   // 2 → 2.5
+        public float bigWinMultiplier = 5f;       // 4 → 5 (빅윈 가치 복원)
+        public float jackpotMultiplier = 10f;     // 8 → 10 (희귀성 보상)
+        public float megaJackpotMultiplier = 100f; // 50 → 100 (초희귀 보상)
 
         [Header("=== 베팅 설정 ===")]
         public float[] betPercentages = { 0.1f, 0.3f, 0.5f, 1f };

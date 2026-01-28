@@ -51,10 +51,11 @@ namespace SlotClicker.Data
         // 메타
         public string lastPlayTime;
         public string version = "1.0";
+        public bool hasSeenTutorial = false;  // 튜토리얼 본 적 있는지
 
         public PlayerData()
         {
-            gold = 100; // 시작 골드
+            gold = 300; // 시작 골드 (100 → 300 초반 진행 개선)
             chips = 0;
             totalGoldEarned = 0;
             totalGoldLost = 0;
@@ -115,7 +116,7 @@ namespace SlotClicker.Data
                 Debug.LogWarning($"[PlayerData] Invalid gold value detected ({gold}), resetting to safe value");
                 gold = Math.Min(gold, MAX_GOLD);
                 if (double.IsNaN(gold) || double.IsInfinity(gold))
-                    gold = 100;
+                    gold = 300;
             }
 
             if (double.IsNaN(totalGoldEarned) || double.IsInfinity(totalGoldEarned))

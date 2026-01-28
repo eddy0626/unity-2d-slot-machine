@@ -87,7 +87,7 @@ namespace SlotClicker.UI
             // 레이아웃 그룹
             VerticalLayoutGroup layout = _upgradePanel.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(15, 15, 15, 15);
-            layout.spacing = 10;
+            layout.spacing = 4f;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
             layout.childControlWidth = true;
@@ -112,19 +112,19 @@ namespace SlotClicker.UI
             titleObj.transform.SetParent(parent);
 
             RectTransform titleRect = titleObj.AddComponent<RectTransform>();
-            titleRect.sizeDelta = new Vector2(0, 50);
+            titleRect.sizeDelta = new Vector2(0, 20f);
 
             Text titleText = titleObj.AddComponent<Text>();
             titleText.text = "UPGRADES";
             titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            titleText.fontSize = 42;
+            titleText.fontSize = 17;
             titleText.fontStyle = FontStyle.Bold;
             titleText.color = Color.white;
             titleText.alignment = TextAnchor.MiddleCenter;
 
             LayoutElement le = titleObj.AddComponent<LayoutElement>();
-            le.minHeight = 50;
-            le.preferredHeight = 50;
+            le.minHeight = 20;
+            le.preferredHeight = 20;
         }
 
         private void CreateTabButtons(Transform parent)
@@ -133,18 +133,18 @@ namespace SlotClicker.UI
             tabContainer.transform.SetParent(parent);
 
             RectTransform tabRect = tabContainer.AddComponent<RectTransform>();
-            tabRect.sizeDelta = new Vector2(0, 50);
+            tabRect.sizeDelta = new Vector2(0, 24f);
 
             HorizontalLayoutGroup tabLayout = tabContainer.AddComponent<HorizontalLayoutGroup>();
-            tabLayout.spacing = 10;
+            tabLayout.spacing = 5f;
             tabLayout.childForceExpandWidth = true;
             tabLayout.childForceExpandHeight = true;
             tabLayout.childControlWidth = true;
             tabLayout.childControlHeight = true;
 
             LayoutElement tabLE = tabContainer.AddComponent<LayoutElement>();
-            tabLE.minHeight = 50;
-            tabLE.preferredHeight = 50;
+            tabLE.minHeight = 24;
+            tabLE.preferredHeight = 24;
 
             // 탭 버튼 생성
             _clickTabButton = CreateTabButton(tabContainer.transform, "CLICK", () => SetCategory(UpgradeCategory.Click));
@@ -179,7 +179,7 @@ namespace SlotClicker.UI
             Text text = textObj.AddComponent<Text>();
             text.text = label;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 26;
+            text.fontSize = 12;
             text.fontStyle = FontStyle.Bold;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
@@ -214,8 +214,8 @@ namespace SlotClicker.UI
             RectTransform viewportRect = viewportObj.AddComponent<RectTransform>();
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = new Vector2(5, 5);
-            viewportRect.offsetMax = new Vector2(-5, -5);
+            viewportRect.offsetMin = new Vector2(2, 2);
+            viewportRect.offsetMax = new Vector2(-2, -2);
 
             Image viewportMask = viewportObj.AddComponent<Image>();
             viewportMask.color = Color.white;
@@ -236,8 +236,8 @@ namespace SlotClicker.UI
             _contentArea.offsetMax = Vector2.zero;
 
             VerticalLayoutGroup contentLayout = contentObj.AddComponent<VerticalLayoutGroup>();
-            contentLayout.padding = new RectOffset(5, 5, 5, 5);
-            contentLayout.spacing = 8;
+            contentLayout.padding = new RectOffset(2, 2, 2, 2);
+            contentLayout.spacing = 4f;
             contentLayout.childForceExpandWidth = true;
             contentLayout.childForceExpandHeight = false;
             contentLayout.childControlWidth = true;
@@ -255,7 +255,7 @@ namespace SlotClicker.UI
             closeObj.transform.SetParent(parent);
 
             RectTransform closeRect = closeObj.AddComponent<RectTransform>();
-            closeRect.sizeDelta = new Vector2(0, 50);  // 터치 타겟 최소 48px 보장
+            closeRect.sizeDelta = new Vector2(0, 24f);  // 터치 타겟 최소 48px 보장
 
             Image closeBg = closeObj.AddComponent<Image>();
             closeBg.color = new Color(0.6f, 0.2f, 0.2f);
@@ -265,8 +265,8 @@ namespace SlotClicker.UI
             closeBtn.onClick.AddListener(Hide);
 
             LayoutElement closeLE = closeObj.AddComponent<LayoutElement>();
-            closeLE.minHeight = 50;  // 터치 타겟 최소 48px 보장
-            closeLE.preferredHeight = 50;
+            closeLE.minHeight = 24;  // 터치 타겟 최소 48px 보장
+            closeLE.preferredHeight = 24;
 
             // 텍스트
             GameObject textObj = new GameObject("Text");
@@ -281,7 +281,7 @@ namespace SlotClicker.UI
             Text text = textObj.AddComponent<Text>();
             text.text = "CLOSE";
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 28;
+            text.fontSize = 13;
             text.fontStyle = FontStyle.Bold;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
@@ -337,22 +337,22 @@ namespace SlotClicker.UI
             itemObj.transform.SetParent(_contentArea);
 
             RectTransform itemRect = itemObj.AddComponent<RectTransform>();
-            itemRect.sizeDelta = new Vector2(0, 100);
+            itemRect.sizeDelta = new Vector2(0, 48f);
 
             Image itemBg = itemObj.AddComponent<Image>();
             itemBg.color = new Color(0.2f, 0.2f, 0.25f);
 
             HorizontalLayoutGroup itemLayout = itemObj.AddComponent<HorizontalLayoutGroup>();
-            itemLayout.padding = new RectOffset(10, 10, 10, 10);
-            itemLayout.spacing = 10;
+            itemLayout.padding = new RectOffset(5, 5, 5, 5);
+            itemLayout.spacing = 5f;
             itemLayout.childForceExpandWidth = false;
             itemLayout.childForceExpandHeight = true;
             itemLayout.childControlWidth = true;
             itemLayout.childControlHeight = true;
 
             LayoutElement itemLE = itemObj.AddComponent<LayoutElement>();
-            itemLE.minHeight = 100;
-            itemLE.preferredHeight = 100;
+            itemLE.minHeight = 48;
+            itemLE.preferredHeight = 48;
 
             // 정보 영역 (텍스트 참조도 반환)
             Text nameText, effectText;
@@ -383,7 +383,7 @@ namespace SlotClicker.UI
             infoLayout.childForceExpandHeight = false;
             infoLayout.childControlWidth = true;
             infoLayout.childControlHeight = true;
-            infoLayout.spacing = 2;
+            infoLayout.spacing = 0.8f;
 
             LayoutElement infoLE = infoObj.AddComponent<LayoutElement>();
             infoLE.flexibleWidth = 1;
@@ -395,7 +395,7 @@ namespace SlotClicker.UI
             Text nameText = nameObj.AddComponent<Text>();
             nameText.text = $"{info.Data.name}  Lv.{info.CurrentLevel}";
             nameText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            nameText.fontSize = 24;
+            nameText.fontSize = 10;
             nameText.fontStyle = FontStyle.Bold;
             nameText.color = Color.white;
             nameTextOut = nameText;
@@ -407,7 +407,7 @@ namespace SlotClicker.UI
             Text descText = descObj.AddComponent<Text>();
             descText.text = info.Data.description;
             descText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            descText.fontSize = 20;
+            descText.fontSize = 8;
             descText.color = new Color(0.7f, 0.7f, 0.7f);
 
             // 효과
@@ -417,7 +417,7 @@ namespace SlotClicker.UI
             Text effectText = effectObj.AddComponent<Text>();
             effectText.text = $"효과: {info.Data.GetEffectDescription(info.CurrentLevel)}";
             effectText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            effectText.fontSize = 20;
+            effectText.fontSize = 8;
             effectText.color = new Color(0.4f, 0.8f, 0.4f);
             effectTextOut = effectText;
 
@@ -439,8 +439,8 @@ namespace SlotClicker.UI
             btn.interactable = info.CanAfford && !info.IsMaxLevel;
 
             LayoutElement btnLE = btnObj.AddComponent<LayoutElement>();
-            btnLE.minWidth = 100;
-            btnLE.preferredWidth = 100;
+            btnLE.minWidth = 48;
+            btnLE.preferredWidth = 48;
 
             // 버튼 텍스트
             GameObject textObj = new GameObject("Text");
@@ -462,7 +462,7 @@ namespace SlotClicker.UI
                 text.text = FormatGold(info.CurrentCost);
             }
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 22;
+            text.fontSize = 11;
             text.fontStyle = FontStyle.Bold;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;

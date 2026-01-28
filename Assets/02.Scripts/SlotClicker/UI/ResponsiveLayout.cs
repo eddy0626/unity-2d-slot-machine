@@ -332,10 +332,10 @@ namespace SlotClicker.UI
     {
         [Header("=== Canvas Scaler 설정 ===")]
         [Tooltip("세로 모드 기준 해상도")]
-        [SerializeField] private Vector2 _portraitReferenceResolution = new Vector2(1080, 1920);
+        [SerializeField] private Vector2 _portraitReferenceResolution = new Vector2(390, 844);
 
         [Tooltip("가로 모드 기준 해상도")]
-        [SerializeField] private Vector2 _landscapeReferenceResolution = new Vector2(1920, 1080);
+        [SerializeField] private Vector2 _landscapeReferenceResolution = new Vector2(844, 390);
 
         [Tooltip("세로 모드 Match (0=Width, 1=Height)")]
         [SerializeField, Range(0f, 1f)] private float _portraitMatch = 0.5f;

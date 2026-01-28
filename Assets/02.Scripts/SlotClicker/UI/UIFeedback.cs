@@ -97,7 +97,7 @@ namespace SlotClicker.UI
             RectTransform panelRect = panel.AddComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(500, 300);
+            panelRect.sizeDelta = new Vector2(200.174f, 120.104f);
 
             Image panelBg = panel.AddComponent<Image>();
             panelBg.color = new Color(0.15f, 0.12f, 0.2f, 0.98f);
@@ -109,12 +109,12 @@ namespace SlotClicker.UI
             RectTransform titleRect = titleObj.AddComponent<RectTransform>();
             titleRect.anchorMin = new Vector2(0, 1);
             titleRect.anchorMax = new Vector2(1, 1);
-            titleRect.anchoredPosition = new Vector2(0, -30);
-            titleRect.sizeDelta = new Vector2(0, 50);
+            titleRect.anchoredPosition = new Vector2(0, -12.01f);
+            titleRect.sizeDelta = new Vector2(0, 20.017f);
 
             _confirmTitleText = titleObj.AddComponent<TextMeshProUGUI>();
             _confirmTitleText.text = "확인";
-            _confirmTitleText.fontSize = 36;
+            _confirmTitleText.fontSize = 14.412f;
             _confirmTitleText.fontStyle = FontStyles.Bold;
             _confirmTitleText.color = Color.white;
             _confirmTitleText.alignment = TextAlignmentOptions.Center;
@@ -131,7 +131,7 @@ namespace SlotClicker.UI
 
             _confirmMessageText = msgObj.AddComponent<TextMeshProUGUI>();
             _confirmMessageText.text = "";
-            _confirmMessageText.fontSize = 28;
+            _confirmMessageText.fontSize = 11.21f;
             _confirmMessageText.color = new Color(0.9f, 0.9f, 0.9f);
             _confirmMessageText.alignment = TextAlignmentOptions.Center;
 
@@ -142,11 +142,11 @@ namespace SlotClicker.UI
             RectTransform btnContainerRect = btnContainer.AddComponent<RectTransform>();
             btnContainerRect.anchorMin = new Vector2(0, 0);
             btnContainerRect.anchorMax = new Vector2(1, 0.3f);
-            btnContainerRect.offsetMin = new Vector2(30, 20);
-            btnContainerRect.offsetMax = new Vector2(-30, -10);
+            btnContainerRect.offsetMin = new Vector2(12.01f, 8.007f);
+            btnContainerRect.offsetMax = new Vector2(-12.01f, -4.003f);
 
             HorizontalLayoutGroup btnLayout = btnContainer.AddComponent<HorizontalLayoutGroup>();
-            btnLayout.spacing = 30;
+            btnLayout.spacing = 12.01f;
             btnLayout.childForceExpandWidth = true;
             btnLayout.childForceExpandHeight = true;
             btnLayout.childControlWidth = true;
@@ -181,7 +181,8 @@ namespace SlotClicker.UI
 
             // 터치 타겟 크기 보장 (최소 48px)
             LayoutElement le = btnObj.AddComponent<LayoutElement>();
-            le.minHeight = 55;
+            le.minHeight = 26.423f;
+            le.preferredHeight = 26.423f;
 
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(btnObj.transform, false);
@@ -194,7 +195,7 @@ namespace SlotClicker.UI
 
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = label;
-            tmp.fontSize = 28;
+            tmp.fontSize = 13.452f;
             tmp.fontStyle = FontStyles.Bold;
             tmp.color = Color.white;
             tmp.alignment = TextAlignmentOptions.Center;
@@ -285,7 +286,7 @@ namespace SlotClicker.UI
             RectTransform toastRect = _toastPanel.AddComponent<RectTransform>();
             toastRect.anchorMin = new Vector2(0.5f, 0.15f);
             toastRect.anchorMax = new Vector2(0.5f, 0.15f);
-            toastRect.sizeDelta = new Vector2(600, 60);
+            toastRect.sizeDelta = new Vector2(240.208f, 24.021f);
 
             Image toastBg = _toastPanel.AddComponent<Image>();
             toastBg.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
@@ -299,11 +300,11 @@ namespace SlotClicker.UI
             RectTransform textRect = textObj.AddComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(15, 5);
-            textRect.offsetMax = new Vector2(-15, -5);
+            textRect.offsetMin = new Vector2(6.005f, 2.002f);
+            textRect.offsetMax = new Vector2(-6.005f, -2.002f);
 
             _toastText = textObj.AddComponent<TextMeshProUGUI>();
-            _toastText.fontSize = 28;
+            _toastText.fontSize = 11.21f;
             _toastText.color = Color.white;
             _toastText.alignment = TextAlignmentOptions.Center;
         }

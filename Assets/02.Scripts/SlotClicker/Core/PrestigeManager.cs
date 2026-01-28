@@ -115,20 +115,30 @@ namespace SlotClicker.Core
         #region 프레스티지 실행
 
         /// <summary>
-        /// 획득 가능한 칩 수 계산 (개선된 공식)
+        /// 획득 가능한 칩 수 계산 (마일스톤 시스템)
         /// </summary>
         public int CalculateChipsToGain()
         {
-            if (_playerData.totalGoldEarned < 500_000) // 50만 골드로 낮춤 (기존 100만)
+            double earned = _playerData.totalGoldEarned;
+
+            // 마일스톤 시스템 (초반 진행 개선)
+            // 50K: 1칩, 250K: 2칩, 500K+: 기존 공식
+            if (earned < 50_000)
                 return 0;
 
-            // 개선된 공식: floor((log10(총 획득 골드) - 5) * 1.5) + 기본 1칩
-            // 50만: 1칩, 100만: 2칩, 1000만: 4칩, 1억: 6칩, 10억: 8칩
-            double logValue = Math.Log10(_playerData.totalGoldEarned) - 5;
-            int baseChips = Mathf.FloorToInt((float)(logValue * 1.5));
+            if (earned < 250_000)
+                return 1;  // 50K 달성: 1칩
 
-            // 최소 1칩 보장 (50만 이상이면)
-            return Mathf.Max(1, baseChips);
+            if (earned < 500_000)
+                return 2;  // 250K 달성: 2칩
+
+            // 500K 이상: 기존 공식 (3칩부터 시작)
+            // floor((log10(총 획득 골드) - 5) * 1.5) + 1
+            // 500K: 3칩, 1M: 4칩, 10M: 5칩, 100M: 7칩, 1B: 9칩
+            double logValue = Math.Log10(earned) - 5;
+            int baseChips = Mathf.FloorToInt((float)(logValue * 1.5)) + 1;
+
+            return Mathf.Max(3, baseChips);
         }
 
         /// <summary>
@@ -158,7 +168,7 @@ namespace SlotClicker.Core
             _playerData.prestigeCount++;
 
             // 골드 및 업그레이드 초기화
-            _playerData.gold = 100; // 시작 골드
+            _playerData.gold = 300; // 시작 골드 (100 → 300 초반 진행 개선)
             _playerData.totalGoldEarned = 0;
             _playerData.totalGoldLost = 0;
             _playerData.totalClicks = 0;

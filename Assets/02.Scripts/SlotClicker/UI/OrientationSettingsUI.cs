@@ -314,54 +314,54 @@ namespace SlotClicker.UI
 
             // 설정 패널 생성
             _settingsPanel = CreatePanel(_targetCanvas.transform, "OrientationSettingsPanel",
-                new Vector2(400, 500), new Color(0.1f, 0.1f, 0.15f, 0.95f));
+                new Vector2(192.167f, 240.209f), new Color(0.1f, 0.1f, 0.15f, 0.95f));
 
             RectTransform panelRect = _settingsPanel.GetComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.anchoredPosition = Vector2.zero;
 
-            float yOffset = 200f;
+            float yOffset = 96.083f;
 
             // 제목
-            CreateLabel(panelRect, "Title", "Orientation Settings", new Vector2(0, yOffset), 32);
-            yOffset -= 60f;
+            CreateLabel(panelRect, "Title", "Orientation Settings", new Vector2(0, yOffset), 12.811f);
+            yOffset -= 28.825f;
 
             // 자동 회전 토글
             _autoRotationToggle = CreateToggle(panelRect, "AutoRotationToggle",
                 "Auto Rotation", new Vector2(0, yOffset));
             _autoRotationLabel = _autoRotationToggle.GetComponentInChildren<TextMeshProUGUI>();
-            yOffset -= 50f;
+            yOffset -= 24.02f;
 
             // 감도 슬라이더
-            CreateLabel(panelRect, "SensitivityLabel", "Sensitivity", new Vector2(0, yOffset), 20);
-            yOffset -= 30f;
+            CreateLabel(panelRect, "SensitivityLabel", "Sensitivity", new Vector2(0, yOffset), 8.007f);
+            yOffset -= 14.412f;
 
             _sensitivitySlider = CreateSlider(panelRect, "SensitivitySlider", new Vector2(0, yOffset));
             _sensitivitySlider.minValue = 0.2f;
             _sensitivitySlider.maxValue = 0.8f;
             _sensitivitySlider.value = 0.5f;
-            yOffset -= 50f;
+            yOffset -= 24.02f;
 
             // 잠금 버튼들
-            CreateLabel(panelRect, "LockLabel", "Lock Orientation", new Vector2(0, yOffset), 20);
-            yOffset -= 40f;
+            CreateLabel(panelRect, "LockLabel", "Lock Orientation", new Vector2(0, yOffset), 8.007f);
+            yOffset -= 19.217f;
 
-            _lockPortraitButton = CreateButton(panelRect, "LockPortrait", "Portrait", new Vector2(-100, yOffset));
-            _lockLandscapeButton = CreateButton(panelRect, "LockLandscape", "Landscape", new Vector2(100, yOffset));
-            yOffset -= 50f;
+            _lockPortraitButton = CreateButton(panelRect, "LockPortrait", "Portrait", new Vector2(-48.042f, yOffset));
+            _lockLandscapeButton = CreateButton(panelRect, "LockLandscape", "Landscape", new Vector2(48.042f, yOffset));
+            yOffset -= 24.02f;
 
-            _lockCurrentButton = CreateButton(panelRect, "LockCurrent", "Lock Current", new Vector2(-100, yOffset));
-            _unlockButton = CreateButton(panelRect, "Unlock", "Unlock", new Vector2(100, yOffset));
-            yOffset -= 60f;
+            _lockCurrentButton = CreateButton(panelRect, "LockCurrent", "Lock Current", new Vector2(-48.042f, yOffset));
+            _unlockButton = CreateButton(panelRect, "Unlock", "Unlock", new Vector2(48.042f, yOffset));
+            yOffset -= 28.825f;
 
             // 강제 전환 버튼
-            CreateLabel(panelRect, "ForceLabel", "Force Orientation", new Vector2(0, yOffset), 20);
-            yOffset -= 40f;
+            CreateLabel(panelRect, "ForceLabel", "Force Orientation", new Vector2(0, yOffset), 8.007f);
+            yOffset -= 19.217f;
 
-            _forcePortraitButton = CreateButton(panelRect, "ForcePortrait", "To Portrait", new Vector2(-100, yOffset));
-            _forceLandscapeButton = CreateButton(panelRect, "ForceLandscape", "To Landscape", new Vector2(100, yOffset));
-            yOffset -= 60f;
+            _forcePortraitButton = CreateButton(panelRect, "ForcePortrait", "To Portrait", new Vector2(-48.042f, yOffset));
+            _forceLandscapeButton = CreateButton(panelRect, "ForceLandscape", "To Landscape", new Vector2(48.042f, yOffset));
+            yOffset -= 28.825f;
 
             // 닫기 버튼
             _closeSettingsButton = CreateButton(panelRect, "CloseSettings", "Close", new Vector2(0, yOffset));
@@ -384,19 +384,19 @@ namespace SlotClicker.UI
             // 외곽선
             Outline outline = panel.AddComponent<Outline>();
             outline.effectColor = new Color(0.8f, 0.6f, 0.2f);
-            outline.effectDistance = new Vector2(2, 2);
+            outline.effectDistance = new Vector2(0.801f, 0.801f);
 
             return panel;
         }
 
-        private TextMeshProUGUI CreateLabel(Transform parent, string name, string text, Vector2 position, int fontSize)
+        private TextMeshProUGUI CreateLabel(Transform parent, string name, string text, Vector2 position, float fontSize)
         {
             GameObject labelObj = new GameObject(name);
             labelObj.transform.SetParent(parent, false);
 
             RectTransform rect = labelObj.AddComponent<RectTransform>();
             rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(350, 40);
+            rect.sizeDelta = new Vector2(168.146f, 19.217f);
 
             TextMeshProUGUI label = labelObj.AddComponent<TextMeshProUGUI>();
             label.text = text;
@@ -414,7 +414,7 @@ namespace SlotClicker.UI
 
             RectTransform rect = btnObj.AddComponent<RectTransform>();
             rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(160, 40);
+            rect.sizeDelta = new Vector2(76.867f, 19.217f);
 
             Image img = btnObj.AddComponent<Image>();
             img.color = new Color(0.3f, 0.3f, 0.4f);
@@ -434,7 +434,7 @@ namespace SlotClicker.UI
 
             TextMeshProUGUI btnText = textObj.AddComponent<TextMeshProUGUI>();
             btnText.text = text;
-            btnText.fontSize = 18;
+            btnText.fontSize = 8.647f;
             btnText.alignment = TextAlignmentOptions.Center;
             btnText.color = Color.white;
 
@@ -448,7 +448,7 @@ namespace SlotClicker.UI
 
             RectTransform rect = toggleObj.AddComponent<RectTransform>();
             rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(300, 40);
+            rect.sizeDelta = new Vector2(144.125f, 19.217f);
 
             Toggle toggle = toggleObj.AddComponent<Toggle>();
 
@@ -459,8 +459,8 @@ namespace SlotClicker.UI
             RectTransform bgRect = bgObj.AddComponent<RectTransform>();
             bgRect.anchorMin = new Vector2(0, 0.5f);
             bgRect.anchorMax = new Vector2(0, 0.5f);
-            bgRect.anchoredPosition = new Vector2(20, 0);
-            bgRect.sizeDelta = new Vector2(30, 30);
+            bgRect.anchoredPosition = new Vector2(9.608f, 0);
+            bgRect.sizeDelta = new Vector2(14.412f, 14.412f);
 
             Image bgImg = bgObj.AddComponent<Image>();
             bgImg.color = new Color(0.3f, 0.3f, 0.4f);
@@ -472,8 +472,8 @@ namespace SlotClicker.UI
             RectTransform checkRect = checkObj.AddComponent<RectTransform>();
             checkRect.anchorMin = Vector2.zero;
             checkRect.anchorMax = Vector2.one;
-            checkRect.offsetMin = new Vector2(5, 5);
-            checkRect.offsetMax = new Vector2(-5, -5);
+            checkRect.offsetMin = new Vector2(2.402f, 2.402f);
+            checkRect.offsetMax = new Vector2(-2.402f, -2.402f);
 
             Image checkImg = checkObj.AddComponent<Image>();
             checkImg.color = new Color(0.2f, 0.8f, 0.2f);
@@ -489,12 +489,12 @@ namespace SlotClicker.UI
             RectTransform labelRect = labelObj.AddComponent<RectTransform>();
             labelRect.anchorMin = new Vector2(0, 0);
             labelRect.anchorMax = new Vector2(1, 1);
-            labelRect.offsetMin = new Vector2(60, 0);
+            labelRect.offsetMin = new Vector2(28.825f, 0);
             labelRect.offsetMax = Vector2.zero;
 
             TextMeshProUGUI label = labelObj.AddComponent<TextMeshProUGUI>();
             label.text = labelText;
-            label.fontSize = 22;
+            label.fontSize = 10.569f;
             label.alignment = TextAlignmentOptions.MidlineLeft;
             label.color = Color.white;
 
@@ -508,7 +508,7 @@ namespace SlotClicker.UI
 
             RectTransform rect = sliderObj.AddComponent<RectTransform>();
             rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(300, 20);
+            rect.sizeDelta = new Vector2(144.125f, 9.608f);
 
             Slider slider = sliderObj.AddComponent<Slider>();
 
@@ -532,8 +532,8 @@ namespace SlotClicker.UI
             RectTransform fillAreaRect = fillArea.AddComponent<RectTransform>();
             fillAreaRect.anchorMin = new Vector2(0, 0.25f);
             fillAreaRect.anchorMax = new Vector2(1, 0.75f);
-            fillAreaRect.offsetMin = new Vector2(5, 0);
-            fillAreaRect.offsetMax = new Vector2(-5, 0);
+            fillAreaRect.offsetMin = new Vector2(2.402f, 0);
+            fillAreaRect.offsetMax = new Vector2(-2.402f, 0);
 
             // 채우기
             GameObject fill = new GameObject("Fill");
@@ -557,15 +557,15 @@ namespace SlotClicker.UI
             RectTransform handleAreaRect = handleArea.AddComponent<RectTransform>();
             handleAreaRect.anchorMin = Vector2.zero;
             handleAreaRect.anchorMax = Vector2.one;
-            handleAreaRect.offsetMin = new Vector2(10, 0);
-            handleAreaRect.offsetMax = new Vector2(-10, 0);
+            handleAreaRect.offsetMin = new Vector2(4.804f, 0);
+            handleAreaRect.offsetMax = new Vector2(-4.804f, 0);
 
             // 핸들
             GameObject handle = new GameObject("Handle");
             handle.transform.SetParent(handleArea.transform, false);
 
             RectTransform handleRect = handle.AddComponent<RectTransform>();
-            handleRect.sizeDelta = new Vector2(20, 0);
+            handleRect.sizeDelta = new Vector2(9.608f, 0);
 
             Image handleImg = handle.AddComponent<Image>();
             handleImg.color = Color.white;
