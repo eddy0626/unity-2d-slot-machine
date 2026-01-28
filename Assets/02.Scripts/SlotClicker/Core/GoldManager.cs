@@ -32,14 +32,37 @@ namespace SlotClicker.Core
         {
             if (amount <= 0) return;
 
-            _playerData.gold += amount;
-            _playerData.totalGoldEarned += amount;
+            // 일일 로그인 보너스 배율 적용
+            float dailyMultiplier = GetDailyLoginMultiplier();
+            double finalAmount = amount * dailyMultiplier;
 
-            OnGoldEarned?.Invoke(amount, isCritical);
+            _playerData.gold += finalAmount;
+            _playerData.totalGoldEarned += finalAmount;
+
+            OnGoldEarned?.Invoke(finalAmount, isCritical);
             OnGoldChanged?.Invoke(_playerData.gold);
             _gameManager.NotifyStateChanged();
 
-            Debug.Log($"[GoldManager] +{amount:N0} gold (Critical: {isCritical}), Total: {_playerData.gold:N0}");
+            if (dailyMultiplier > 1f)
+            {
+                Debug.Log($"[GoldManager] +{finalAmount:N0} gold (Daily {dailyMultiplier:F1}x), Total: {_playerData.gold:N0}");
+            }
+            else
+            {
+                Debug.Log($"[GoldManager] +{finalAmount:N0} gold, Total: {_playerData.gold:N0}");
+            }
+        }
+
+        /// <summary>
+        /// 일일 로그인 보너스 배율 반환
+        /// </summary>
+        private float GetDailyLoginMultiplier()
+        {
+            if (_gameManager.DailyLogin != null)
+            {
+                return _gameManager.DailyLogin.GetActiveMultiplier();
+            }
+            return 1f;
         }
 
         /// <summary>

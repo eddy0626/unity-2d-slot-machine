@@ -290,7 +290,7 @@ namespace SlotClicker.UI
             float vipBonus = _prestige.GetVIPBonus() * 100f;
 
             UIFeedback.Instance.ShowToast(
-                $"🎉 VIP 등급 상승! {rankName} (+{vipBonus:F0}% 보너스)",
+                $"[VIP UP] {rankName} (+{vipBonus:F0}% 보너스)",
                 new Color(1f, 0.85f, 0.2f),
                 3f,
                 ToastType.Success

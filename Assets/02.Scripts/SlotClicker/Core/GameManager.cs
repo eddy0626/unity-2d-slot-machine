@@ -31,6 +31,8 @@ namespace SlotClicker.Core
         public SlotManager Slot { get; private set; }
         public UpgradeManager Upgrade { get; private set; }
         public PrestigeManager Prestige { get; private set; }
+        public DailyLoginManager DailyLogin { get; private set; }
+        public DailyQuestManager DailyQuest { get; private set; }
 
         // SoundManager는 싱글톤으로 접근
         public SoundManager Sound => SoundManager.Instance;
@@ -105,6 +107,53 @@ namespace SlotClicker.Core
             // PrestigeManager 초기화
             Prestige = gameObject.AddComponent<PrestigeManager>();
             Prestige.Initialize(this);
+
+            // DailyLoginManager 초기화
+            DailyLogin = new DailyLoginManager(PlayerData);
+
+            // DailyQuestManager 초기화
+            DailyQuest = new DailyQuestManager(PlayerData, this);
+
+            // 퀘스트 이벤트 연결
+            SetupQuestTracking();
+        }
+
+        /// <summary>
+        /// 퀘스트 진행 이벤트 연결
+        /// </summary>
+        private void SetupQuestTracking()
+        {
+            // 클릭 이벤트 → 클릭 퀘스트 + 크리티컬 퀘스트
+            Click.OnClick += (result) =>
+            {
+                DailyQuest.UpdateProgress(DailyQuestManager.QuestType.Click, 1);
+                if (result.IsCritical)
+                {
+                    DailyQuest.UpdateProgress(DailyQuestManager.QuestType.Critical, 1);
+                }
+            };
+
+            // 스핀 완료 이벤트 → 스핀 퀘스트 + 승리 퀘스트 + 잭팟 퀘스트
+            Slot.OnSpinComplete += (result) =>
+            {
+                DailyQuest.UpdateProgress(DailyQuestManager.QuestType.Spin, 1);
+
+                if (result.IsWin)
+                {
+                    DailyQuest.UpdateProgress(DailyQuestManager.QuestType.WinSpin, 1);
+                }
+
+                if (result.Outcome == SlotOutcome.Jackpot || result.Outcome == SlotOutcome.MegaJackpot)
+                {
+                    DailyQuest.UpdateProgress(DailyQuestManager.QuestType.Jackpot, 1);
+                }
+            };
+
+            // 골드 획득 이벤트 → 골드 획득 퀘스트
+            Gold.OnGoldEarned += (amount, isCritical) =>
+            {
+                DailyQuest.UpdateProgress(DailyQuestManager.QuestType.EarnGold, (int)amount);
+            };
         }
 
         private void LoadPlayerData()

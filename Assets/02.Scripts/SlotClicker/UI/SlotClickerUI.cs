@@ -329,6 +329,9 @@ namespace SlotClicker.UI
 
             _game = GameManager.Instance;
 
+            // 폰트 매니저 초기화
+            FontManager.Initialize();
+
             if (_autoCreateUI)
             {
                 CreateUI();
@@ -338,6 +341,9 @@ namespace SlotClicker.UI
                 // 에디터에서 설정한 참조 사용
                 SetupExistingUI();
             }
+
+            // 생성된 모든 UI에 커스텀 폰트 적용
+            ApplyCustomFont();
 
             BindEvents();
 
@@ -358,6 +364,12 @@ namespace SlotClicker.UI
             // WebGL 해상도 수정 컴포넌트 추가
             SetupWebGLResolutionFix();
 
+            // 일일 로그인 시스템 초기화
+            SetupDailyLoginSystem();
+
+            // 일일 퀘스트 시스템 초기화
+            SetupDailyQuestSystem();
+
             // 첫 실행 시 도움말 자동 표시
             CheckFirstTimeTutorial();
         }
@@ -377,7 +389,7 @@ namespace SlotClicker.UI
                     {
                         ToggleHelpPanel();
                         _game.PlayerData.hasSeenTutorial = true;
-                        ShowToast("게임 방법을 확인하세요! 👆", new Color(0.5f, 0.8f, 1f), 3f);
+                        ShowToast("게임 방법을 확인하세요!", new Color(0.5f, 0.8f, 1f), 3f);
                     }
                 });
             }
@@ -1399,6 +1411,95 @@ namespace SlotClicker.UI
                 Debug.Log("[SlotClickerUI] WebGLResolutionFix component added");
             }
 #endif
+        }
+
+        /// <summary>
+        /// 일일 로그인 시스템 설정
+        /// </summary>
+        private DailyLoginUI _dailyLoginUI;
+
+        private void SetupDailyLoginSystem()
+        {
+            if (_game == null || _game.DailyLogin == null || _mainCanvas == null) return;
+
+            // DailyLoginUI 컴포넌트 추가
+            _dailyLoginUI = gameObject.AddComponent<DailyLoginUI>();
+            _dailyLoginUI.Initialize(_game.DailyLogin, _mainCanvas);
+
+            // 일일 로그인 체크 (약간의 딜레이 후)
+            DOVirtual.DelayedCall(0.5f, () =>
+            {
+                _game.DailyLogin.CheckDailyLogin();
+            });
+
+            // 보상 수령 시 토스트 표시
+            _game.DailyLogin.OnDailyRewardClaimed += OnDailyRewardClaimed;
+
+            Debug.Log("[SlotClickerUI] Daily login system initialized");
+        }
+
+        private void OnDailyRewardClaimed(DailyLoginReward reward)
+        {
+            string message = $"Day {reward.Day} 보상 수령!\n골드 {reward.GoldMultiplier:F1}x ({reward.DurationHours}시간)";
+            if (reward.BonusChips > 0)
+            {
+                message += $"\n+ 보너스 칩 {reward.BonusChips}개!";
+            }
+            ShowToast(message, new Color(1f, 0.8f, 0.2f), 4f);
+        }
+
+        /// <summary>
+        /// 일일 퀘스트 시스템 설정
+        /// </summary>
+        private DailyQuestUI _dailyQuestUI;
+
+        private void SetupDailyQuestSystem()
+        {
+            if (_game == null || _game.DailyQuest == null || _mainCanvas == null) return;
+
+            // DailyQuestUI 컴포넌트 추가
+            _dailyQuestUI = gameObject.AddComponent<DailyQuestUI>();
+            _dailyQuestUI.Initialize(_game.DailyQuest, _mainCanvas);
+
+            // 퀘스트 완료 시 토스트 표시
+            _game.DailyQuest.OnQuestCompleted += OnQuestCompleted;
+
+            // 모든 퀘스트 완료 시 축하 메시지
+            _game.DailyQuest.OnAllQuestsCompleted += OnAllQuestsCompleted;
+
+            Debug.Log("[SlotClickerUI] Daily quest system initialized");
+        }
+
+        private void OnQuestCompleted(SlotClicker.Core.DailyQuest quest)
+        {
+            ShowToast($"퀘스트 완료!\n{quest.Description}", new Color(0.3f, 0.8f, 0.3f), 3f);
+        }
+
+        private void OnAllQuestsCompleted()
+        {
+            ShowToast("모든 일일 퀘스트 완료!\n보상을 수령하세요!", new Color(1f, 0.85f, 0.3f), 4f);
+        }
+
+        /// <summary>
+        /// 모든 UI에 커스텀 폰트 적용
+        /// </summary>
+        private void ApplyCustomFont()
+        {
+            if (!FontManager.HasCustomFont) return;
+
+            // 메인 캔버스 하위 모든 TMP에 폰트 적용
+            if (_mainCanvas != null)
+            {
+                FontManager.ApplyFontToAll(_mainCanvas.gameObject);
+            }
+
+            // 플로팅 텍스트 프리팹에 폰트 적용
+            if (_floatingTextPrefab != null)
+            {
+                FontManager.ApplyFontToAll(_floatingTextPrefab);
+            }
+
+            Debug.Log("[SlotClickerUI] Custom font applied to all UI elements");
         }
 
         #region Click Streak / Overdrive
@@ -2966,7 +3067,7 @@ namespace SlotClicker.UI
         private void CreateHelpContent(RectTransform parent)
         {
             // 제목
-            GameObject titleObj = CreateTextObject(parent, "HelpTitle", "🎰 슬롯 게임 가이드",
+            GameObject titleObj = CreateTextObject(parent, "HelpTitle", "[SLOT] 슬롯 게임 가이드",
                 new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -12.01f), 16.815f);
             var titleText = titleObj.GetComponent<TextMeshProUGUI>();
             titleText.color = new Color(1f, 0.85f, 0.3f);
@@ -2985,7 +3086,7 @@ namespace SlotClicker.UI
             // === 페이라인 설명 섹션 ===
             float yPos = -36.031f;
 
-            CreateHelpSection(parent, "📍 페이라인 (당첨 라인)", ref yPos);
+            CreateHelpSection(parent, ">> 페이라인 (당첨 라인)", ref yPos);
             CreateHelpText(parent, "3x3 슬롯에서 같은 심볼 3개가 라인에 맞으면 당첨!", ref yPos);
             CreateHelpText(parent, "", ref yPos);  // 공백
 
@@ -2995,7 +3096,7 @@ namespace SlotClicker.UI
             yPos -= 8.007f;
 
             // === 배당률 설명 섹션 ===
-            CreateHelpSection(parent, "💰 배당률 (베팅액 기준)", ref yPos);
+            CreateHelpSection(parent, "$ 배당률 (베팅액 기준)", ref yPos);
 
             string[] payoutInfo = {
                 "• 미니윈 (2줄 일치): 2.0배",
@@ -3013,7 +3114,7 @@ namespace SlotClicker.UI
             yPos -= 6.005f;
 
             // === 연승 콤보 설명 ===
-            CreateHelpSection(parent, "🔥 연승 콤보 보너스", ref yPos);
+            CreateHelpSection(parent, "* 연승 콤보 보너스", ref yPos);
             CreateHelpText(parent, "연속 당첨 시 보너스 배율 증가!", ref yPos);
             CreateHelpText(parent, "• 2연승: +10% / 3연승: +20%", ref yPos, 10.409f, new Color(1f, 0.9f, 0.6f));
             CreateHelpText(parent, "• 5연승: +50% / 10연승: +100%!", ref yPos, 10.409f, new Color(1f, 0.9f, 0.6f));
@@ -3021,7 +3122,7 @@ namespace SlotClicker.UI
             yPos -= 6.005f;
 
             // === 게임 팁 ===
-            CreateHelpSection(parent, "💡 게임 팁", ref yPos);
+            CreateHelpSection(parent, "! 게임 팁", ref yPos);
             CreateHelpText(parent, "• 자동수집을 먼저 구매하세요!", ref yPos, 10.409f, new Color(0.7f, 0.9f, 1f));
             CreateHelpText(parent, "• 50K 골드에서 첫 프레스티지 가능", ref yPos, 10.409f, new Color(0.7f, 0.9f, 1f));
             CreateHelpText(parent, "• AUTO 버튼으로 자동 스핀!", ref yPos, 10.409f, new Color(0.7f, 0.9f, 1f));
@@ -3106,7 +3207,7 @@ namespace SlotClicker.UI
             }
 
             // 예시 설명
-            GameObject exampleObj = CreateTextObject(parent, "Example", "예: 🍒🍒🍒 = 당첨!",
+            GameObject exampleObj = CreateTextObject(parent, "Example", "예: [7][7][7] = 당첨!",
                 new Vector2(0, 1), new Vector2(0, 1), new Vector2(descX, descY - 4.003f), 10.409f);
             var exampleText = exampleObj.GetComponent<TextMeshProUGUI>();
             exampleText.color = new Color(0.5f, 1f, 0.5f);
@@ -3274,7 +3375,15 @@ namespace SlotClicker.UI
         {
             if (_game == null) return;
 
-            _goldText.text = $"GOLD: {_game.Gold.GetFormattedGold()}";
+            // 골드 표시 (일일 보너스 활성 시 배율 표시)
+            string goldText = $"GOLD: {_game.Gold.GetFormattedGold()}";
+            if (_game.DailyLogin != null && _game.DailyLogin.IsRewardActive)
+            {
+                float mult = _game.DailyLogin.CurrentMultiplier;
+                goldText += $" <color=yellow>({mult:F1}x)</color>";
+            }
+            _goldText.text = goldText;
+
             int chips = _game.Prestige?.TotalChips ?? _game.PlayerData.chips;
             _chipsText.text = $"{chips} Chips";
             UpdateBetAmount();

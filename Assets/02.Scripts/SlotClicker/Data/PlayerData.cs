@@ -53,6 +53,18 @@ namespace SlotClicker.Data
         public string version = "1.0";
         public bool hasSeenTutorial = false;  // 튜토리얼 본 적 있는지
 
+        // 일일 로그인 시스템
+        public int loginStreak = 0;           // 연속 로그인 일수 (1-7)
+        public int totalLoginDays = 0;        // 총 로그인 일수
+        public bool hasClaimedDailyReward = false;  // 오늘 보상 수령 여부
+        public string lastLoginDate = "";     // 마지막 로그인 날짜
+        public string rewardExpiryTime = "";  // 보상 만료 시간
+        public float dailyMultiplier = 1f;    // 현재 적용 중인 배율
+
+        // 일일 퀘스트 시스템
+        public List<SlotClicker.Core.DailyQuest> dailyQuests = new List<SlotClicker.Core.DailyQuest>();
+        public string questRefreshDate = "";  // 퀘스트 갱신 날짜
+
         public PlayerData()
         {
             gold = 300; // 시작 골드 (100 → 300 초반 진행 개선)
