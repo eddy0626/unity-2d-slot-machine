@@ -48,6 +48,20 @@ namespace SlotClicker.UI
 
         private Canvas _mainCanvas;
 
+        [SerializeField] private UIFeedbackLayoutProfile _layoutProfile;
+
+        private UIFeedbackLayoutProfile Layout => _layoutProfile != null
+            ? _layoutProfile
+            : UIFeedbackLayoutProfile.Default;
+
+        public void SetLayoutProfile(UIFeedbackLayoutProfile profile)
+        {
+            if (profile != null)
+            {
+                _layoutProfile = profile;
+            }
+        }
+
         private void Awake()
         {
             if (_instance != null && _instance != this)
@@ -181,8 +195,8 @@ namespace SlotClicker.UI
 
             // 터치 타겟 크기 보장 (최소 48px)
             LayoutElement le = btnObj.AddComponent<LayoutElement>();
-            le.minHeight = 26.423f;
-            le.preferredHeight = 26.423f;
+            le.minHeight = Layout.ConfirmButtonHeight;
+            le.preferredHeight = Layout.ConfirmButtonHeight;
 
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(btnObj.transform, false);
@@ -195,7 +209,7 @@ namespace SlotClicker.UI
 
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = label;
-            tmp.fontSize = 13.452f;
+            tmp.fontSize = Layout.ConfirmButtonFont;
             tmp.fontStyle = FontStyles.Bold;
             tmp.color = Color.white;
             tmp.alignment = TextAlignmentOptions.Center;
